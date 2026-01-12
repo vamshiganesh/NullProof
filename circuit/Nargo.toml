@@ -2,6 +2,6 @@
 name = "nullproof_non_membership"
 type = "bin"
 authors = ["NullProof"]
-compiler_version = ">=1.0.0-beta.19"
+compiler_version = "1.0.0-beta.19"
 
 [dependencies]

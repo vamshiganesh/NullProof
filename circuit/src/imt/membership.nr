@@ -6,12 +6,12 @@ use crate::utils::address::{
 };
 
 pub struct IndexedLeaf {
-    pub value: Field,
-    pub next_value: Field,
-    pub next_index: Field,
+    pub value: u64,
+    pub next_value: u64,
+    pub next_index: u64,
 }
 
-pub fn leaf_from_fields(value: Field, next_value: Field, next_index: Field) -> IndexedLeaf {
+pub fn leaf_from_fields(value: u64, next_value: u64, next_index: u64) -> IndexedLeaf {
     IndexedLeaf {
         value,
         next_value,
@@ -28,7 +28,11 @@ pub fn assert_valid_leaf_structure(leaf: IndexedLeaf) {
     assert_values_not_equal(as_query_value(leaf.value), as_query_value(leaf.next_index));
 }
 
-pub fn compute_leaf_root(leaf: IndexedLeaf, siblings: [Field; 20], path_indices: [u1; 20]) -> Field {
+pub fn compute_leaf_root(
+    leaf: IndexedLeaf,
+    siblings: [Field; 20],
+    path_indices: [u1; 20]
+) -> Field {
     let leaf_hash = commit_leaf(leaf);
     compute_merkle_root(leaf_hash, siblings, path_indices)
 }

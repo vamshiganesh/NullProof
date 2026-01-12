@@ -1,6 +1,6 @@
-pub type QueryValue = Field;
+pub type QueryValue = u64;
 
-pub fn as_query_value(value: Field) -> QueryValue {
+pub fn as_query_value(value: u64) -> QueryValue {
     value
 }
 

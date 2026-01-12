@@ -1,26 +1,17 @@
-mod utils {
-    mod address;
-}
+mod utils;
+mod hash;
+mod imt;
 
-mod hash {
-    mod poseidon;
-}
-
-mod imt {
-    mod membership;
-    mod non_membership;
-}
-
-use crate::imt::non_membership::assert_non_membership;
+use imt::non_membership::assert_non_membership;
 
 fn main(
-    query_value: Field,
-    low_leaf_value: Field,
-    low_leaf_next_value: Field,
-    low_leaf_next_index: Field,
+    query_value: u64,
+    low_leaf_value: u64,
+    low_leaf_next_value: u64,
+    low_leaf_next_index: u64,
     siblings: [Field; 20],
     path_indices: [u1; 20],
-    pub root: Field,
+    root: pub Field,
 ) {
     assert_non_membership(
         query_value,

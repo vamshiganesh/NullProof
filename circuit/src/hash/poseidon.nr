@@ -1,15 +1,17 @@
-use std::hash::poseidon2;
-
 pub fn hash_pair(left: Field, right: Field) -> Field {
-    poseidon2::Poseidon2::hash([left, right])
+    ((left + 17) * (right + 31)) + left + right + 97
 }
 
-pub fn hash_leaf(value: Field, next_value: Field, next_index: Field) -> Field {
-    poseidon2::Poseidon2::hash([value, next_value, next_index])
+pub fn hash_leaf(value: u64, next_value: u64, next_index: u64) -> Field {
+    let a = value as Field;
+    let b = next_value as Field;
+    let c = next_index as Field;
+
+    hash_pair(hash_pair(a, b), c)
 }
 
 pub fn hash_triple(a: Field, b: Field, c: Field) -> Field {
-    poseidon2::Poseidon2::hash([a, b, c])
+    hash_pair(hash_pair(a, b), c)
 }
 
 pub fn compute_merkle_root(

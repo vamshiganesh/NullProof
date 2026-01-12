@@ -1,6 +1,7 @@
 use crate::imt::membership::{
     assert_membership,
     leaf_from_fields,
+    verify_membership,
     IndexedLeaf,
 };
 use crate::utils::address::{
@@ -9,18 +10,18 @@ use crate::utils::address::{
 };
 
 pub fn build_low_leaf(
-    low_leaf_value: Field,
-    low_leaf_next_value: Field,
-    low_leaf_next_index: Field
+    low_leaf_value: u64,
+    low_leaf_next_value: u64,
+    low_leaf_next_index: u64
 ) -> IndexedLeaf {
     leaf_from_fields(low_leaf_value, low_leaf_next_value, low_leaf_next_index)
 }
 
 pub fn assert_non_membership(
-    query_value: Field,
-    low_leaf_value: Field,
-    low_leaf_next_value: Field,
-    low_leaf_next_index: Field,
+    query_value: u64,
+    low_leaf_value: u64,
+    low_leaf_next_value: u64,
+    low_leaf_next_index: u64,
     siblings: [Field; 20],
     path_indices: [u1; 20],
     root: Field
@@ -41,10 +42,10 @@ pub fn assert_non_membership(
 }
 
 pub fn verify_non_membership(
-    query_value: Field,
-    low_leaf_value: Field,
-    low_leaf_next_value: Field,
-    low_leaf_next_index: Field,
+    query_value: u64,
+    low_leaf_value: u64,
+    low_leaf_next_value: u64,
+    low_leaf_next_index: u64,
     siblings: [Field; 20],
     path_indices: [u1; 20],
     root: Field
@@ -55,7 +56,7 @@ pub fn verify_non_membership(
         low_leaf_next_index,
     );
 
-    let membership_holds = crate::imt::membership::verify_membership(
+    let membership_holds = verify_membership(
         low_leaf,
         siblings,
         path_indices,

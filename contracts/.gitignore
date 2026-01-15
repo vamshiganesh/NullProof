@@ -1,0 +1,9 @@
+# Foundry build artifacts
+out/
+cache/
+
+# Environment variables — never commit
+.env
+
+# Forge dependencies managed as submodules
+# lib/ is committed via git submodules, individual files ignored by forge

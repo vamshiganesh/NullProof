@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    /* Language & Environment */
+    "target":      "ES2022",
+    "module":      "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib":         ["ES2022"],
+
+    /* Strictness */
+    "strict":                     true,
+    "noUncheckedIndexedAccess":   true,
+    "noImplicitOverride":         true,
+    "exactOptionalPropertyTypes": true,
+
+    /* Output */
+    "outDir":      "./dist",
+    "rootDir":     "./src",
+    "declaration": true,
+    "sourceMap":   true,
+
+    /* Interop */
+    "esModuleInterop":       true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule":     true,
+
+    /* Type checking only — tsx handles execution */
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

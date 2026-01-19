@@ -16,12 +16,14 @@
   "dependencies": {
     "@zk-kit/imt": "^2.0.0-beta.8",
     "axios": "^1.7.2",
+    "dotenv": "^17.4.2",
     "ethers": "^6.13.1",
     "fast-xml-parser": "^4.4.0",
     "winston": "^3.13.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
+    "@types/node-cron": "^3.0.11",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.5.0",
@@ -30,5 +32,8 @@
   },
   "allowScripts": {
     "esbuild@0.28.0": true
+  },
+  "optionalDependencies": {
+    "node-cron": "^4.2.1"
   }
 }

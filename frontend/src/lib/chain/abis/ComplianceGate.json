@@ -1,0 +1,235 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      { "name": "initialOwner",      "type": "address", "internalType": "address" },
+      { "name": "sanctionsListAddr", "type": "address", "internalType": "address" },
+      { "name": "verifierAddr",      "type": "address", "internalType": "address" }
+    ],
+    "stateMutability": "nonpayable"
+  },
+
+  {
+    "type": "function",
+    "name": "assertCompliant",
+    "inputs": [
+      { "name": "proof",        "type": "bytes",    "internalType": "bytes" },
+      { "name": "publicInputs", "type": "bytes32[]","internalType": "bytes32[]" },
+      { "name": "nullifier",    "type": "bytes32",  "internalType": "bytes32" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+
+  {
+    "type": "function",
+    "name": "checkCompliant",
+    "inputs": [
+      { "name": "proof",        "type": "bytes",    "internalType": "bytes" },
+      { "name": "publicInputs", "type": "bytes32[]","internalType": "bytes32[]" },
+      { "name": "nullifier",    "type": "bytes32",  "internalType": "bytes32" }
+    ],
+    "outputs": [
+      { "name": "valid", "type": "bool", "internalType": "bool" }
+    ],
+    "stateMutability": "view"
+  },
+
+  {
+    "type": "function",
+    "name": "isNullifierUsed",
+    "inputs": [
+      { "name": "nullifier", "type": "bytes32", "internalType": "bytes32" }
+    ],
+    "outputs": [
+      { "name": "", "type": "bool", "internalType": "bool" }
+    ],
+    "stateMutability": "view"
+  },
+
+  {
+    "type": "function",
+    "name": "nullifierUsedAt",
+    "inputs": [
+      { "name": "nullifier", "type": "bytes32", "internalType": "bytes32" }
+    ],
+    "outputs": [
+      { "name": "", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+
+  {
+    "type": "function",
+    "name": "sanctionsList",
+    "inputs": [],
+    "outputs": [
+      { "name": "", "type": "address", "internalType": "address" }
+    ],
+    "stateMutability": "view"
+  },
+
+  {
+    "type": "function",
+    "name": "verifier",
+    "inputs": [],
+    "outputs": [
+      { "name": "", "type": "address", "internalType": "address" }
+    ],
+    "stateMutability": "view"
+  },
+
+  {
+    "type": "function",
+    "name": "validityWindow",
+    "inputs": [],
+    "outputs": [
+      { "name": "", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "view"
+  },
+
+  {
+    "type": "function",
+    "name": "submissionPaused",
+    "inputs": [],
+    "outputs": [
+      { "name": "", "type": "bool", "internalType": "bool" }
+    ],
+    "stateMutability": "view"
+  },
+
+  {
+    "type": "function",
+    "name": "setValidityWindow",
+    "inputs": [
+      { "name": "newWindow", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+
+  {
+    "type": "function",
+    "name": "setVerifier",
+    "inputs": [
+      { "name": "newVerifier", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+
+  {
+    "type": "function",
+    "name": "setSubmissionPaused",
+    "inputs": [
+      { "name": "paused", "type": "bool", "internalType": "bool" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+
+  {
+    "type": "function",
+    "name": "owner",
+    "inputs": [],
+    "outputs": [
+      { "name": "", "type": "address", "internalType": "address" }
+    ],
+    "stateMutability": "view"
+  },
+
+  {
+    "type": "function",
+    "name": "renounceOwnership",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+
+  {
+    "type": "function",
+    "name": "transferOwnership",
+    "inputs": [
+      { "name": "newOwner", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+
+  {
+    "type": "event",
+    "name": "ProofVerified",
+    "inputs": [
+      { "name": "nullifier",  "type": "bytes32", "internalType": "bytes32", "indexed": true },
+      { "name": "root",       "type": "bytes32", "internalType": "bytes32", "indexed": true },
+      { "name": "validUntil", "type": "uint256", "internalType": "uint256", "indexed": false }
+    ],
+    "anonymous": false
+  },
+
+  {
+    "type": "event",
+    "name": "NullifierConsumed",
+    "inputs": [
+      { "name": "nullifier", "type": "bytes32", "internalType": "bytes32", "indexed": true },
+      { "name": "caller",    "type": "address", "internalType": "address", "indexed": true }
+    ],
+    "anonymous": false
+  },
+
+  {
+    "type": "event",
+    "name": "ValidityWindowUpdated",
+    "inputs": [
+      { "name": "previousWindow", "type": "uint256", "internalType": "uint256", "indexed": false },
+      { "name": "newWindow",      "type": "uint256", "internalType": "uint256", "indexed": false }
+    ],
+    "anonymous": false
+  },
+
+  {
+    "type": "event",
+    "name": "VerifierUpdated",
+    "inputs": [
+      { "name": "previousVerifier", "type": "address", "internalType": "address", "indexed": true },
+      { "name": "newVerifier",      "type": "address", "internalType": "address", "indexed": true }
+    ],
+    "anonymous": false
+  },
+
+  {
+    "type": "event",
+    "name": "SubmissionPauseToggled",
+    "inputs": [
+      { "name": "paused", "type": "bool", "internalType": "bool", "indexed": false }
+    ],
+    "anonymous": false
+  },
+
+  {
+    "type": "event",
+    "name": "OwnershipTransferred",
+    "inputs": [
+      { "name": "previousOwner", "type": "address", "internalType": "address", "indexed": true },
+      { "name": "newOwner",      "type": "address", "internalType": "address", "indexed": true }
+    ],
+    "anonymous": false
+  },
+
+  { "type": "error", "name": "InvalidProof",           "inputs": [] },
+  { "type": "error", "name": "UnknownRoot",             "inputs": [] },
+  { "type": "error", "name": "ProofExpired",            "inputs": [] },
+  { "type": "error", "name": "EmptyProof",              "inputs": [] },
+  { "type": "error", "name": "SubmissionPaused",        "inputs": [] },
+  {
+    "type": "error",
+    "name": "NullifierAlreadyUsed",
+    "inputs": [
+      { "name": "nullifier", "type": "bytes32", "internalType": "bytes32" }
+    ]
+  },
+  { "type": "error", "name": "OwnableUnauthorizedAccount", "inputs": [{ "name": "account", "type": "address", "internalType": "address" }] },
+  { "type": "error", "name": "OwnableInvalidOwner",        "inputs": [{ "name": "owner",   "type": "address", "internalType": "address" }] },
+  { "type": "error", "name": "ReentrancyGuardReentrantCall", "inputs": [] }
+]

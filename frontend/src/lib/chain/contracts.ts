@@ -17,19 +17,12 @@ import ComplianceGateABI from "./abis/ComplianceGate.json";
 import SanctionsListABI  from "./abis/SanctionsList.json";
 import VerifierABI       from "./abis/Verifier.json";
 
-// ---------------------------------------------------------------------------
-// Temporary inline constants — replace with:
-//   import { ... } from "@/lib/constants";
-// once File 52 (frontend/src/lib/constants.ts) is written.
-// ---------------------------------------------------------------------------
-const COMPLIANCE_GATE_ADDRESS =
-  (import.meta.env.VITE_COMPLIANCE_GATE_ADDRESS as string) ?? "";
-const SANCTIONS_LIST_ADDRESS  =
-  (import.meta.env.VITE_SANCTIONS_LIST_ADDRESS  as string) ?? "";
-const VERIFIER_ADDRESS        =
-  (import.meta.env.VITE_VERIFIER_ADDRESS        as string) ?? "";
-const SUPPORTED_CHAIN_ID      = 11155111; // Sepolia
-
+import {
+  COMPLIANCE_GATE_ADDRESS,
+  SANCTIONS_LIST_ADDRESS,
+  VERIFIER_ADDRESS,
+  SUPPORTED_CHAIN_ID,
+} from "@/lib/constants";
 // ---------------------------------------------------------------------------
 // EIP-1193 window.ethereum type augmentation
 // ---------------------------------------------------------------------------

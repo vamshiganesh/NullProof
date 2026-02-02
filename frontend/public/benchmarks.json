@@ -1,0 +1,28 @@
+{
+  "capturedAt":  "2026-06-06T00:00:00.000Z",
+  "version":     "0.1.0",
+  "environment": "MacBook M2 Pro / Chrome 125",
+  "entries": [
+    {
+      "label":    "Witness Generation",
+      "medianMs": 180,
+      "p95Ms":    210,
+      "p99Ms":    240,
+      "samples":  100
+    },
+    {
+      "label":    "Proof Generation (UltraHonk)",
+      "medianMs": 4200,
+      "p95Ms":    4800,
+      "p99Ms":    5300,
+      "samples":  100
+    },
+    {
+      "label":    "Proof Verification (on-chain)",
+      "medianMs": 320,
+      "p95Ms":    410,
+      "p99Ms":    480,
+      "samples":  100
+    }
+  ]
+}

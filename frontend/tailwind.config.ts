@@ -71,12 +71,18 @@ export default {
           "0%":   { opacity: "0", transform: "translateY(8px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        indeterminate: {                                    // ADD
+          "0%":   { left: "-33%", width: "33%" },          // ADD
+          "50%":  { left: "30%",  width: "50%" },          // ADD
+          "100%": { left: "110%", width: "33%" },          // ADD
+        },
       },
       animation: {
         shimmer:  "shimmer 2.5s linear infinite",
         pulseSoft:"pulseSoft 2s ease-in-out infinite",
         scanline: "scanline 2.4s linear infinite",
         countUp:  "countUp 300ms ease-out",
+        indeterminate: "indeterminate 1.4s ease-in-out infinite",
       },
       backgroundImage: {
         "panel-grid":

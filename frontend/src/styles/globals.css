@@ -450,3 +450,8 @@
     box-shadow: var(--shadow-glow);
   }
 }
+
+@keyframes proofPulse {
+  from { transform: scaleY(0.4); opacity: 0.5; }
+  to   { transform: scaleY(1);   opacity: 1;   }
+}

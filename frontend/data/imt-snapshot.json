@@ -1,0 +1,41 @@
+{
+    "_comment": "frontend/data/imt-snapshot.json — Seed snapshot (mock data). Replaced daily by the oracle cron job. DO NOT edit manually; see oracle/src/snapshot-builder.ts.",
+  
+    "root": "0x1f7c3d9a2e804b56f8c01d4a73e2918b6f5c2d0e8a3b7941c6f0d5e92b84a17f",
+    "depth": 20,
+    "addressCount": 30,
+    "builtAt": "2026-06-07T00:00:00.000Z",
+  
+    "leaves": [
+      "0x02c4d8e1a3f7b295c640e8d1f3a2b794c5e087d19b3f46a2c8e750d1f3a27b94",
+      "0x04a17f3c8e2d5b960f4c81a3d7e2f195b6048c3a91d7f25b8e640c1d3f9a27b8",
+      "0x07b3e9d1f4a285c7e0b3d8f1a4c2795d6e10b4f2a8d631c5e7f094b2d3a8c17e",
+      "0x0a5c2e8f1b4d739c6f08d2a5e9b3c17f4d802e6a1c4f938b2d5e7f194c3a860b",
+      "0x0d8f4a2b7e1c596d3f0a8e4b2c1d975e6f03b5a2d4c7819f3e0b6a2d5f8c140e",
+      "0x112e7b5a3c9f084d2e6a1c8f3b5d24a9e7018c4b2f5d839a1c6e4b7f2d908a3c",
+      "0x14b3d8f2a5c091e4b7d2f9a3c6e158b4d703a9f1c5e827d3b0f4a6c2d8e91b50",
+      "0x17e1c4a8f2b657d3a9c0e5b8f1d3926c4a017e5b2f8d04a9c7e1b6d3f5a28c90",
+      "0x1ac6e3b8d0f4529a1e7c2b4d8f095b3a6e10c5d2f8a4b917e3c0d6f1a4b8295e",
+      "0x1e2f8b4d7a0c593e1f6b2d4a8c3e07f5b91a6d3c0f4e8b2a7d51c9f3b0e6a28d",
+      "0x212a9d5f3b7e041c8f2a5d9b3e6c18f4a02b7e5c1f3d840a9b2e6c4f8a13d750",
+      "0x247b4e9c1f5a283d6b0e4c8f2a5d1b9e307c5a2e8f1b4d6c0f3a9b5e2d81c47f",
+      "0x27c8a3e5b1f072d4c9e1b3f6a2d5809c1e4b7f3a0d6c5e8b2f4a19d3c7b050e6",
+      "0x2af4d7b2e9c0531a8d3f6b1c4e9a2b75d0183c5a7f2e940b1d6c4f8b3e0a27d5",
+      "0x2e3a8c6f0d4b19e2c5a7b3f8d1e046c9b2a7f5d3e0c8b1a6f4d2e9c5b37a08f1",
+      "0x31d5b8e2a4f097c3d1e6b2f8a5c3d08b1e4c9a7f2b5d3e60a1c8f4b7d2e905a3",
+      "0x35a2f8d4b0e7c391d5b2e8a4c1f7d9b3050e6c2a8f4b1d7c3e0a9f5b2d4e817c",
+      "0x39b7c4a1e8f250d6b3a9e1f4c7d2b08e5a32c9f6b1d4e7a0c3f5b8d2e1a49c70",
+      "0x3df0a8b2c5e1479d3b0c8e5a2f7d1b94c60a3e8f1d5b2c7f9e0a4b3d6c815f20",
+      "0x41e3c9a5d2f806b4c7a1e9b3f0d2c58a1e40b6f3c9d2a5e7b1f08c4d3a6e29b5",
+      "0x45b0d7f3c2a9e485b1d8f2a4c9e3b176d0802c5a7f1d3b9e4c2a6f8b0d5c3170",
+      "0x49c4f1a8d3b7e025c9a5d1f8b2e4c70a3f186b4d2c9e5a1f7b3d0c8a4e6b291f",
+      "0x4d8e3b2a7f4c159d0b6a3e8f1c5d2b97a41e8c3f0b5d9a2c6e1b4f7d3a0c852e",
+      "0x51f2a9c4b6d8e037a1c5f9b2d4e8a17c502f3b6d1a8c4e7f0b9d2a5c3e6f180b",
+      "0x55d4c7a1f3b8e290c6a2d5f1b8c3e7a04160d3b9f2c5a8e1d7b4f0c2a6e38b91",
+      "0x59a8e2f5d1c407b3a9f2d6c4b8e1a53c70249e5a1c8f3b6d2a7e4c9b1f5d380a",
+      "0x5db3c9a7e4f1028b5d3a8c2e6f9b1d47a50386c1d5f2b8a4e7c0f3b9d1a6c482",
+      "0x61e7d4f2a9c3058b6e1d4a8c2f5b9e37d60491a8c2f5b0e7d3c1a4f9b6d8e205",
+      "0x65b1c8f4d2a7e39c0f5b3d8a1e4c6f2b71058d4a7c1e9f2b6d0a3c8f5d2b4e170",
+      "0x69d5e0b3f7a2c498d1b6e3a9f5c2d87e40162b9c5a8f0d3e7b1c4f2a8d6b9c03e"
+    ]
+  }

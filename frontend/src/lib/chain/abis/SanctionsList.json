@@ -1,193 +1,323 @@
 [
   {
-    "type": "constructor",
     "inputs": [
-      { "name": "initialOwner",   "type": "address", "internalType": "address" },
-      { "name": "initialUpdater", "type": "address", "internalType": "address" }
+      {
+        "internalType": "address",
+        "name": "initialOwner",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "initialUpdater",
+        "type": "address"
+      }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "constructor"
   },
-
   {
-    "type": "function",
-    "name": "updateRoot",
     "inputs": [
-      { "name": "newRoot",      "type": "bytes32", "internalType": "bytes32" },
-      { "name": "addressCount", "type": "uint256", "internalType": "uint256" }
+      {
+        "internalType": "address",
+        "name": "updater",
+        "type": "address"
+      }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-
-  {
-    "type": "function",
-    "name": "currentRoot",
-    "inputs": [],
-    "outputs": [
-      { "name": "", "type": "bytes32", "internalType": "bytes32" }
-    ],
-    "stateMutability": "view"
-  },
-
-  {
-    "type": "function",
-    "name": "lastUpdatedAt",
-    "inputs": [],
-    "outputs": [
-      { "name": "", "type": "uint256", "internalType": "uint256" }
-    ],
-    "stateMutability": "view"
-  },
-
-  {
-    "type": "function",
-    "name": "currentAddressCount",
-    "inputs": [],
-    "outputs": [
-      { "name": "", "type": "uint256", "internalType": "uint256" }
-    ],
-    "stateMutability": "view"
-  },
-
-  {
-    "type": "function",
-    "name": "getRootHistory",
-    "inputs": [
-      { "name": "root", "type": "bytes32", "internalType": "bytes32" }
-    ],
-    "outputs": [
-      { "name": "addressCount", "type": "uint256", "internalType": "uint256" },
-      { "name": "timestamp",    "type": "uint256", "internalType": "uint256" },
-      { "name": "exists",       "type": "bool",    "internalType": "bool"    }
-    ],
-    "stateMutability": "view"
-  },
-
-  {
-    "type": "function",
-    "name": "isKnownRoot",
-    "inputs": [
-      { "name": "root", "type": "bytes32", "internalType": "bytes32" }
-    ],
-    "outputs": [
-      { "name": "", "type": "bool", "internalType": "bool" }
-    ],
-    "stateMutability": "view"
-  },
-
-  {
-    "type": "function",
-    "name": "isAuthorisedUpdater",
-    "inputs": [
-      { "name": "account", "type": "address", "internalType": "address" }
-    ],
-    "outputs": [
-      { "name": "", "type": "bool", "internalType": "bool" }
-    ],
-    "stateMutability": "view"
-  },
-
-  {
-    "type": "function",
-    "name": "getRecentRoots",
-    "inputs": [
-      { "name": "n", "type": "uint256", "internalType": "uint256" }
-    ],
-    "outputs": [
-      { "name": "roots",      "type": "bytes32[]", "internalType": "bytes32[]" },
-      { "name": "timestamps", "type": "uint256[]", "internalType": "uint256[]" }
-    ],
-    "stateMutability": "view"
-  },
-
-  {
-    "type": "function",
     "name": "authoriseUpdater",
-    "inputs": [
-      { "name": "updater", "type": "address", "internalType": "address" }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
-
   {
-    "type": "function",
-    "name": "revokeUpdater",
-    "inputs": [
-      { "name": "updater", "type": "address", "internalType": "address" }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-
-  {
-    "type": "function",
-    "name": "owner",
     "inputs": [],
+    "name": "currentAddressCount",
     "outputs": [
-      { "name": "", "type": "address", "internalType": "address" }
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
-
   {
-    "type": "function",
-    "name": "renounceOwnership",
     "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "name": "currentRoot",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
-
   {
-    "type": "function",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "n",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRecentRoots",
+    "outputs": [
+      {
+        "internalType": "bytes32[]",
+        "name": "roots",
+        "type": "bytes32[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "timestamps",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "root",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getRootHistory",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "addressCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "exists",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "isAuthorisedUpdater",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "root",
+        "type": "bytes32"
+      }
+    ],
+    "name": "isKnownRoot",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "lastUpdatedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "updater",
+        "type": "address"
+      }
+    ],
+    "name": "revokeUpdater",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
     "name": "transferOwnership",
-    "inputs": [
-      { "name": "newOwner", "type": "address", "internalType": "address" }
-    ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
-
   {
-    "type": "event",
-    "name": "RootUpdated",
     "inputs": [
-      { "name": "previousRoot",  "type": "bytes32", "internalType": "bytes32", "indexed": true  },
-      { "name": "newRoot",       "type": "bytes32", "internalType": "bytes32", "indexed": true  },
-      { "name": "addressCount",  "type": "uint256", "internalType": "uint256", "indexed": false },
-      { "name": "timestamp",     "type": "uint256", "internalType": "uint256", "indexed": false }
+      {
+        "internalType": "bytes32",
+        "name": "newRoot",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "addressCount",
+        "type": "uint256"
+      }
     ],
-    "anonymous": false
+    "name": "updateRoot",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
-
   {
-    "type": "event",
-    "name": "UpdaterAuthorised",
+    "anonymous": false,
     "inputs": [
-      { "name": "updater", "type": "address", "internalType": "address", "indexed": true }
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
     ],
-    "anonymous": false
-  },
-
-  {
-    "type": "event",
-    "name": "UpdaterRevoked",
-    "inputs": [
-      { "name": "updater", "type": "address", "internalType": "address", "indexed": true }
-    ],
-    "anonymous": false
-  },
-
-  {
-    "type": "event",
     "name": "OwnershipTransferred",
-    "inputs": [
-      { "name": "previousOwner", "type": "address", "internalType": "address", "indexed": true },
-      { "name": "newOwner",      "type": "address", "internalType": "address", "indexed": true }
-    ],
-    "anonymous": false
+    "type": "event"
   },
-
-  { "type": "error", "name": "OwnableUnauthorizedAccount", "inputs": [{ "name": "account", "type": "address", "internalType": "address" }] },
-  { "type": "error", "name": "OwnableInvalidOwner",        "inputs": [{ "name": "owner",   "type": "address", "internalType": "address" }] }
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "previousRoot",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "newRoot",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "addressCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "updatedAt",
+        "type": "uint256"
+      }
+    ],
+    "name": "RootUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "updater",
+        "type": "address"
+      }
+    ],
+    "name": "UpdaterAuthorised",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "updater",
+        "type": "address"
+      }
+    ],
+    "name": "UpdaterRevoked",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  }
 ]

@@ -15,7 +15,7 @@ import { sepolia } from "viem/chains";
 
 import ComplianceGateABI from "./abis/ComplianceGate.json";
 import SanctionsListABI  from "./abis/SanctionsList.json";
-import VerifierABI       from "./abis/Verifier.json";
+import VerifierABI       from "./abis/HonkVerifier.json";
 
 import {
   COMPLIANCE_GATE_ADDRESS,

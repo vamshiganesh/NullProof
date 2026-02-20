@@ -1,0 +1,389 @@
+# .github/workflows/ci.yml
+#
+# NullProof — Continuous Integration
+#
+# Runs on every pull request (any branch → main) and on direct pushes to
+# main. Four independent jobs run in parallel where possible:
+#
+#   lint-typecheck   ESLint + Prettier + tsc for frontend & oracle
+#   noir-test        nargo test for the nullproof_non_membership circuit
+#   forge-test       Forge build + fuzz tests + coverage under [profile.ci]
+#   ci-gate          Required status check — passes only when all three pass
+#
+# The ci-gate job is what you register as a required branch-protection rule.
+# It has no logic of its own; it just depends on all real jobs. This means
+# you only need one required-check entry in GitHub branch settings and the
+# set of real jobs can grow freely without touching branch protection rules.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel any in-progress run for the same PR / branch so pushes don't queue
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimal token permissions — read-only for checkout, no write access needed
+permissions:
+  contents: read
+
+# ---------------------------------------------------------------------------
+# Shared environment values reused across jobs
+# ---------------------------------------------------------------------------
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9"
+  # Verified locally: nargo --version → 1.0.0-beta.19
+  NARGO_VERSION: "1.0.0-beta.19"
+  # Forge/Anvil version — keep in sync with foundry.lock
+  FOUNDRY_VERSION: "stable"
+
+# ===========================================================================
+# Job 1 — Lint, format, typecheck (TS/TSX across workspace)
+# ===========================================================================
+jobs:
+  lint-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false   # Submodules not needed for TS checks
+
+      # ── Node.js + pnpm ────────────────────────────────────────────────────
+      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      # ── Install dependencies ──────────────────────────────────────────────
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Prettier format check ─────────────────────────────────────────────
+      - name: Check formatting (Prettier)
+        run: pnpm format:check
+
+      # ── ESLint ────────────────────────────────────────────────────────────
+      - name: Lint (ESLint)
+        run: pnpm lint
+
+      # ── TypeScript (frontend + oracle) ────────────────────────────────────
+      - name: Typecheck (TypeScript)
+        run: pnpm typecheck
+
+  # ===========================================================================
+  # Job 2 — Noir circuit tests
+  # ===========================================================================
+  noir-test:
+    name: Noir Circuit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: circuit
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      # ── Install nargo via noirup ───────────────────────────────────────────
+      - name: Install noirup
+        run: curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+        shell: bash
+
+      - name: Add noirup to PATH
+        run: echo "$HOME/.nargo/bin" >> $GITHUB_PATH
+
+      - name: Install nargo ${{ env.NARGO_VERSION }}
+        run: noirup --version ${{ env.NARGO_VERSION }}
+        shell: bash
+
+      - name: Verify nargo version
+        run: nargo --version
+
+      # ── Cache nargo compilation artifacts ─────────────────────────────────
+      - name: Cache nargo target
+        uses: actions/cache@v4
+        with:
+          path: circuit/target
+          key: nargo-target-${{ env.NARGO_VERSION }}-${{ hashFiles('circuit/src/**/*.nr', 'circuit/Nargo.toml') }}
+          restore-keys: |
+            nargo-target-${{ env.NARGO_VERSION }}-
+
+      # ── Compile + test ────────────────────────────────────────────────────
+      - name: Compile circuit
+        run: nargo compile
+
+      - name: Run Noir tests
+        run: nargo test --show-output
+
+  # ===========================================================================
+  # Job 3 — Solidity / Forge tests (+ gas snapshot + coverage)
+  # ===========================================================================
+  forge-test:
+    name: Forge Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25   # Extra 5 min budget for coverage instrumentation
+    # Coverage lcov upload needs write access to PR checks
+    permissions:
+      contents: read
+      pull-requests: write
+
+    defaults:
+      run:
+        working-directory: contracts
+
+    steps:
+      # ── Checkout WITH submodules ───────────────────────────────────────────
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ── Install Foundry ───────────────────────────────────────────────────
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+
+      - name: Verify forge version
+        run: forge --version
+
+      # ── Cache forge build artifacts ───────────────────────────────────────
+      - name: Cache Forge build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            contracts/out
+            contracts/cache
+          key: forge-${{ env.FOUNDRY_VERSION }}-${{ hashFiles('contracts/src/**/*.sol', 'contracts/lib/**/*.sol', 'contracts/foundry.toml') }}
+          restore-keys: |
+            forge-${{ env.FOUNDRY_VERSION }}-
+
+      # ── Build ─────────────────────────────────────────────────────────────
+      - name: Build contracts (forge build)
+        run: forge build --sizes
+        # --sizes surfaces any contract that exceeds the 24KB deploy limit
+
+      # ── Solidity formatter check ──────────────────────────────────────────
+      - name: Check Solidity formatting (forge fmt)
+        run: forge fmt --check
+
+      # ── Run tests ─────────────────────────────────────────────────────────
+      # FOUNDRY_PROFILE=ci → [profile.ci]: fuzz.runs=1000, verbosity=3
+      - name: Run Forge tests
+        run: forge test --gas-report
+        env:
+          FOUNDRY_PROFILE: ci
+
+      # ── Gas snapshot ──────────────────────────────────────────────────────
+      # Produces .gas-snapshot in contracts/ — the artifact is uploaded so
+      # each PR's gas costs can be compared to the base branch diff in the
+      # "Artifacts" section of the Actions run.
+      #
+      # To compare gas locally:
+      #   git stash
+      #   forge snapshot --check   # compares against the committed snapshot
+      - name: Generate gas snapshot
+        run: forge snapshot
+        env:
+          FOUNDRY_PROFILE: ci
+
+      - name: Upload gas snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gas-snapshot-${{ github.sha }}
+          path: contracts/.gas-snapshot
+          retention-days: 90
+          # 90 days keeps history across ~3 months of PRs without burning
+          # storage quota. Adjust down to 30 if the repo is very active.
+
+      # On pull requests, diff the snapshot against the base branch and post
+      # the delta as a PR comment. This is the "gas regression tracking" step.
+      - name: Download base branch gas snapshot (PR only)
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ci.yml
+          branch: ${{ github.base_ref }}
+          name: gas-snapshot-*
+          name_is_regexp: true
+          # Download most recent snapshot from the base branch
+          workflow_conclusion: success
+          path: contracts/.gas-snapshot-base
+          # Don't fail the job if no prior snapshot exists yet (first run)
+          if_no_artifact_found: warn
+        continue-on-error: true
+
+      - name: Comment gas diff on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const currentPath  = 'contracts/.gas-snapshot';
+            const baseDir      = 'contracts/.gas-snapshot-base';
+
+            // Find the downloaded base snapshot file (name includes SHA)
+            let baseContent = null;
+            if (fs.existsSync(baseDir)) {
+              const files = fs.readdirSync(baseDir, { recursive: true })
+                             .filter(f => f.endsWith('.gas-snapshot'));
+              if (files.length > 0) {
+                baseContent = fs.readFileSync(path.join(baseDir, files[0]), 'utf8');
+              }
+            }
+
+            const currentContent = fs.existsSync(currentPath)
+              ? fs.readFileSync(currentPath, 'utf8') : '';
+
+            if (!baseContent) {
+              console.log('No base snapshot found — skipping gas diff comment.');
+              return;
+            }
+
+            // Parse snapshot lines: "TestName:functionName() (gas: 12345)"
+            function parseSnapshot(text) {
+              const map = {};
+              for (const line of text.split('\n')) {
+                const m = line.match(/^(.+?)\s+\(gas:\s+(\d+)\)$/);
+                if (m) map[m[1]] = Number(m[2]);
+              }
+              return map;
+            }
+
+            const base    = parseSnapshot(baseContent);
+            const current = parseSnapshot(currentContent);
+            const allKeys = new Set([...Object.keys(base), ...Object.keys(current)]);
+
+            const rows = [];
+            for (const key of [...allKeys].sort()) {
+              const b = base[key]    ?? null;
+              const c = current[key] ?? null;
+              if (b === c) continue;   // unchanged — skip
+
+              const delta = (b !== null && c !== null) ? c - b : null;
+              const pct   = (b && delta !== null) ? ((delta / b) * 100).toFixed(1) : '—';
+              const sign  = delta > 0 ? '+' : '';
+              const emoji = delta === null ? '🆕' : delta > 0 ? '🔴' : '🟢';
+
+              rows.push(`| ${emoji} | \`${key}\` | ${b ?? '—'} | ${c ?? '—'} | ${delta !== null ? sign + delta : '—'} | ${delta !== null ? sign + pct + '%' : '—'} |`);
+            }
+
+            if (rows.length === 0) {
+              console.log('No gas changes detected.');
+              return;
+            }
+
+            const body = [
+              '## ⛽ Gas Snapshot Diff',
+              '',
+              '| | Test | Base | PR | Δ Gas | Δ % |',
+              '|---|---|---:|---:|---:|---:|',
+              ...rows,
+              '',
+              `_Generated for commit \`${context.sha.slice(0, 7)}\` vs \`${context.payload.pull_request.base.sha.slice(0, 7)}\`_`,
+            ].join('\n');
+
+            // Find and update existing comment, or create a new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.startsWith('## ⛽ Gas Snapshot Diff'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner:      context.repo.owner,
+                repo:       context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner:       context.repo.owner,
+                repo:        context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # ── Solidity coverage ─────────────────────────────────────────────────
+      # forge coverage --report lcov writes lcov.info under contracts/.
+      # The lcov report is uploaded as an artifact for local inspection.
+      # If you later add Codecov or Coveralls, point them at this file.
+      - name: Generate Solidity coverage report
+        run: forge coverage --report lcov --report summary
+        env:
+          FOUNDRY_PROFILE: ci
+        # `summary` prints a per-contract table to the log.
+        # `lcov` writes contracts/lcov.info for upload.
+
+      - name: Upload coverage report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: solidity-coverage-${{ github.sha }}
+          path: contracts/lcov.info
+          retention-days: 30
+
+      # Optional: post a coverage summary comment to PRs.
+      # Uncomment the block below once you've connected Codecov:
+      #
+      # - name: Upload to Codecov
+      #   uses: codecov/codecov-action@v4
+      #   with:
+      #     files: contracts/lcov.info
+      #     flags: solidity
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ===========================================================================
+  # Job 4 — Required gate (register THIS as the branch-protection check)
+  # ===========================================================================
+  ci-gate:
+    name: CI Gate ✓
+    runs-on: ubuntu-latest
+    needs:
+      - lint-typecheck
+      - noir-test
+      - forge-test
+    if: always()
+
+    steps:
+      - name: All checks passed
+        run: |
+          echo "lint-typecheck : ${{ needs.lint-typecheck.result }}"
+          echo "noir-test      : ${{ needs.noir-test.result }}"
+          echo "forge-test     : ${{ needs.forge-test.result }}"
+
+          if [[ "${{ needs.lint-typecheck.result }}" != "success" || \
+                "${{ needs.noir-test.result }}"    != "success" || \
+                "${{ needs.forge-test.result }}"   != "success" ]]; then
+            echo ""
+            echo "❌  One or more CI jobs failed. See individual job logs above."
+            exit 1
+          fi
+
+          echo ""
+          echo "✅  All CI jobs passed."

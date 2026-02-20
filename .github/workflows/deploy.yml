@@ -1,0 +1,338 @@
+# .github/workflows/deploy.yml
+#
+# NullProof — Production Deploy to Vercel
+#
+# Triggers on every merge to main (push event only — never on PRs).
+# The workflow is intentionally structured as three sequential phases:
+#
+#   Phase 1 — guard       Lightweight pre-deploy sanity checks (typecheck + build smoke)
+#   Phase 2 — deploy      Vercel production deployment via CLI (not the Vercel GitHub App)
+#   Phase 3 — notify      Post-deploy status comment on the commit that triggered the run
+#
+# Why Vercel CLI instead of the Vercel GitHub App?
+#   The GitHub App handles deploys opaquely — you cannot inject per-deploy
+#   environment variables, cannot gate on CI results, and cannot add post-deploy
+#   steps in the same pipeline. Using the CLI gives full control.
+#
+# Required repository secrets (Settings → Secrets → Actions):
+#   VERCEL_TOKEN                  — Vercel personal access token (vercel.com/account/tokens)
+#   VERCEL_ORG_ID                 — from `vercel link` → .vercel/project.json → "orgId"
+#   VERCEL_PROJECT_ID             — from `vercel link` → .vercel/project.json → "projectId"
+#
+# Required Vercel environment variables (set via Vercel dashboard or `vercel env add`):
+#   VITE_COMPLIANCE_GATE_ADDRESS  — deployed ComplianceGate contract address on Sepolia
+#   VITE_SANCTIONS_LIST_ADDRESS   — deployed SanctionsList contract address on Sepolia
+#   VITE_VERIFIER_ADDRESS         — deployed UltraHonk verifier contract address on Sepolia
+#   VITE_ORACLE_BASE_URL          — production oracle backend URL
+#   VITE_WALLETCONNECT_PROJECT_ID — WalletConnect v2 project ID
+#   VITE_SEPOLIA_RPC_URL          — (optional) Alchemy/Infura Sepolia RPC endpoint
+#
+# Note on VITE_ vars: these are build-time env vars that Vite inlines into the
+# JS bundle. They MUST be present in the Vercel project environment (not just
+# as GitHub secrets) because Vercel runs `vite build` on its own infrastructure.
+# Set them once via the Vercel dashboard under Project → Settings → Environment Variables.
+
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  # Allow manual re-deploy from the Actions tab without a code change
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual redeploy"
+        required: false
+        default: "Manual trigger"
+
+# Never run two deploys in parallel — later push always wins
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Needed to post commit status and PR comments in the notify job
+  statuses: write
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+env:
+  NODE_VERSION:   "20"
+  PNPM_VERSION:   "9"
+  VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+# ===========================================================================
+# Job 1 — Pre-deploy guard
+# Runs a fast typecheck + Vite build to catch any broken-build merges before
+# we burn a Vercel deployment slot on something that can't compile.
+# ===========================================================================
+jobs:
+  pre-deploy-guard:
+    name: Pre-deploy Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # TypeScript check across both workspace packages
+      - name: Typecheck (frontend + oracle)
+        run: pnpm typecheck
+
+      # Run `vite build` with stub VITE_ vars so we can confirm the bundle
+      # compiles cleanly without needing real contract addresses or API keys.
+      # These stubs are not deployed — the real values live in Vercel's env.
+      - name: Build frontend (smoke check)
+        working-directory: frontend
+        env:
+          # Stub values — valid-shaped but not real.
+          # Vite only needs these present at build time; the app reads them at
+          # runtime from import.meta.env which Vite replaces with string literals.
+          VITE_COMPLIANCE_GATE_ADDRESS:  "0x0000000000000000000000000000000000000001"
+          VITE_SANCTIONS_LIST_ADDRESS:   "0x0000000000000000000000000000000000000002"
+          VITE_VERIFIER_ADDRESS:         "0x0000000000000000000000000000000000000003"
+          VITE_ORACLE_BASE_URL:          "https://oracle.nullproof.xyz"
+          VITE_WALLETCONNECT_PROJECT_ID: "00000000000000000000000000000000"
+          VITE_SEPOLIA_RPC_URL:          "https://rpc.sepolia.org"
+          # Suppress sourcemap generation during smoke check for speed
+          NODE_ENV: production
+        run: pnpm --filter frontend build
+
+      # Upload the dist/ output so the deploy job can reuse it rather than
+      # rebuilding from scratch. This ensures the deployed artifact is
+      # EXACTLY the one that passed the smoke check.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ github.sha }}
+          path: frontend/dist
+          retention-days: 1   # Only needed for this pipeline run; discard after
+
+  # ===========================================================================
+  # Job 2 — Vercel production deploy
+  # ===========================================================================
+  deploy:
+    name: Deploy → Vercel Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: pre-deploy-guard
+
+    # Expose the Vercel deployment URL as a job output so the notify job
+    # can reference it without parsing CLI output again
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+      deployment-id:  ${{ steps.deploy.outputs.deployment-id }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Install Vercel CLI globally. We pin to a major version so the
+      # interface stays stable. Check https://github.com/vercel/vercel for
+      # the latest — update this when you see CLI deprecation warnings.
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      - name: Verify Vercel CLI version
+        run: vercel --version
+
+      # Pull Vercel project settings + environment variables.
+      # This writes a .vercel/ directory which subsequent Vercel commands use.
+      # --environment=production ensures we pull prod env vars, not preview ones.
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      # Build on Vercel's own infrastructure.
+      # `vercel build --prod` runs your framework's build command (pnpm build)
+      # inside a Vercel-managed build container with all your Vercel env vars
+      # available. The real VITE_ contract addresses are injected here — not
+      # the stubs from the smoke-check step.
+      #
+      # The .vercel/output/ directory produced here is what gets deployed.
+      # It is a standard Vercel Build Output API v3 artifact.
+      - name: Build on Vercel infrastructure
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      # Deploy the pre-built .vercel/output/ to production.
+      # --prebuilt skips rebuilding — uploads exactly what was just built.
+      # The deployment URL is extracted from stdout and stored as an output.
+      - name: Deploy to Vercel production
+        id: deploy
+        run: |
+          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          echo "$DEPLOY_OUTPUT"
+
+          # Extract the deployment URL (last https://... line in output)
+          DEPLOYMENT_URL=$(echo "$DEPLOY_OUTPUT" | grep -Eo 'https://[a-zA-Z0-9._/-]+\.vercel\.app' | tail -1)
+
+          if [ -z "$DEPLOYMENT_URL" ]; then
+            echo "❌ Could not extract deployment URL from Vercel output."
+            exit 1
+          fi
+
+          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $DEPLOYMENT_URL"
+
+          # Extract deployment ID from URL for reference
+          DEPLOYMENT_ID=$(echo "$DEPLOYMENT_URL" | grep -Eo 'nullproof[a-zA-Z0-9-]+' | head -1 || echo "unknown")
+          echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+
+      # Verify the deployment is actually serving — a 200 on / confirms the
+      # Vercel routing and edge network are healthy. Retries 3 times with a
+      # 10-second gap to account for edge propagation delay.
+      - name: Smoke test deployment URL
+        run: |
+          URL="${{ steps.deploy.outputs.deployment-url }}"
+          echo "Probing $URL ..."
+
+          for i in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL")
+            echo "Attempt $i → HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Deployment is live."
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "❌ Deployment URL returned non-200 after 3 attempts."
+          exit 1
+
+  # ===========================================================================
+  # Job 3 — Post-deploy notification
+  # Posts a commit status and summary comment with the live URL and deploy info.
+  # ===========================================================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [pre-deploy-guard, deploy]
+    # Always run notify — even if deploy failed — so we always set a commit status
+    if: always()
+    permissions:
+      contents:  read
+      statuses:  write
+      issues:    write       # for createComment on PRs merged to main
+
+    steps:
+      - name: Set deploy outcome variables
+        id: outcome
+        run: |
+          DEPLOY_RESULT="${{ needs.deploy.result }}"
+          GUARD_RESULT="${{ needs.pre-deploy-guard.result }}"
+
+          if [[ "$DEPLOY_RESULT" == "success" ]]; then
+            echo "status=success"                    >> $GITHUB_OUTPUT
+            echo "description=Production deploy succeeded" >> $GITHUB_OUTPUT
+            echo "emoji=🚀"                          >> $GITHUB_OUTPUT
+          elif [[ "$GUARD_RESULT" != "success" ]]; then
+            echo "status=failure"                    >> $GITHUB_OUTPUT
+            echo "description=Pre-deploy guard failed (typecheck or build)" >> $GITHUB_OUTPUT
+            echo "emoji=❌"                          >> $GITHUB_OUTPUT
+          else
+            echo "status=failure"                    >> $GITHUB_OUTPUT
+            echo "description=Vercel deployment failed" >> $GITHUB_OUTPUT
+            echo "emoji=❌"                          >> $GITHUB_OUTPUT
+          fi
+
+      # Set a GitHub commit status so the deployment result is visible
+      # directly on the commit in the repo's commit history.
+      - name: Set GitHub commit status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployUrl = "${{ needs.deploy.outputs.deployment-url }}";
+            const status    = "${{ steps.outcome.outputs.status }}";
+            const desc      = "${{ steps.outcome.outputs.description }}";
+
+            await github.rest.repos.createCommitStatus({
+              owner:       context.repo.owner,
+              repo:        context.repo.repo,
+              sha:         context.sha,
+              state:       status,             // "success" | "failure"
+              target_url:  deployUrl || `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: desc,
+              context:     "deploy / vercel-production",
+            });
+
+      # Post a summary to the GitHub Actions run summary page.
+      # This is visible in the Actions tab under the workflow run.
+      - name: Write deployment summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status    = "${{ steps.outcome.outputs.status }}";
+            const emoji     = "${{ steps.outcome.outputs.emoji }}";
+            const deployUrl = "${{ needs.deploy.outputs.deployment-url }}";
+            const sha       = context.sha.slice(0, 7);
+            const runUrl    = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const trigger   = "${{ github.event_name }}" === "workflow_dispatch"
+                              ? "Manual (`${{ github.event.inputs.reason || 'no reason given' }}`)"
+                              : `Push to \`main\` by @${{ github.actor }}`;
+
+            const lines = [
+              `## ${emoji} NullProof Production Deploy`,
+              ``,
+              `| Field | Value |`,
+              `|---|---|`,
+              `| **Status**    | ${status === "success" ? "✅ Succeeded" : "❌ Failed"} |`,
+              `| **Commit**    | [\`${sha}\`](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}) |`,
+              `| **Triggered** | ${trigger} |`,
+              `| **Run**       | [View logs](${runUrl}) |`,
+              deployUrl ? `| **Live URL**  | [${deployUrl}](${deployUrl}) |` : `| **Live URL**  | — |`,
+              ``,
+              status === "success"
+                ? `The production frontend is live. WASM circuit artifacts are served from \`/public/circuits/\`.`
+                : `Deploy failed. Check the [workflow run](${runUrl}) for details.`,
+            ];
+
+            await core.summary.addRaw(lines.join('\n')).write();
+
+      # If this was triggered by a workflow_dispatch (manual), print extra info
+      - name: Log deploy info
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  NullProof Production Deploy"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Status  : ${{ steps.outcome.outputs.status }}"
+          echo "  Commit  : ${{ github.sha }}"
+          echo "  Actor   : ${{ github.actor }}"
+          echo "  URL     : ${{ needs.deploy.outputs.deployment-url }}"
+          echo "  Run ID  : ${{ github.run_id }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

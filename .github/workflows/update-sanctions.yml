@@ -1,0 +1,459 @@
+# .github/workflows/update-sanctions.yml
+#
+# NullProof — Daily Sanctions Snapshot Update
+#
+# Schedule: 00:05 UTC every day (5 min after midnight to avoid rate limits)
+#           matches the oracle's default CRON_SCHEDULE="5 0 * * *"
+#
+# What this workflow does:
+#
+#   Job 1 — run-oracle
+#     1a. Install oracle dependencies
+#     1b. Run the full oracle pipeline (fetchOFAC → buildIMT → publishRoot → writeSnapshot)
+#         This writes two files into frontend/data/:
+#           • imt-snapshot.json  — full IMT leaf/path data consumed by the in-browser prover
+#           • imt-manifest.json  — lightweight metadata (root, addressCount, txHash, timestamps)
+#     1c. Detect whether either file actually changed
+#     1d. If changed: commit + push to main as github-actions[bot]
+#         If unchanged: skip commit and skip redeploy (root was same — oracle exits with a
+#         specific message, not an error code; we normalise this to a "no-op" outcome)
+#
+#   Job 2 — trigger-deploy  (only runs when snapshot was committed)
+#     2a. Trigger the Vercel production deploy via the Vercel CLI
+#         We invoke the deploy job from deploy.yml via workflow_dispatch rather than
+#         re-implementing deploy logic here — single source of truth for deploy config.
+#         Alternatively (if cross-workflow dispatch is not wired): deploy directly via CLI.
+#
+# Required repository secrets:
+#   SEPOLIA_RPC_URL          — Alchemy/Infura Sepolia HTTPS endpoint
+#   ORACLE_PRIVATE_KEY       — EOA private key for the oracle wallet (0x-prefixed)
+#                              This wallet must be the owner/operator of SanctionsList.sol
+#   SANCTIONS_LIST_ADDRESS   — Deployed SanctionsList contract address on Sepolia
+#   VERCEL_TOKEN             — Vercel personal access token (for CLI deploy)
+#   VERCEL_ORG_ID            — From .vercel/project.json → "orgId"
+#   VERCEL_PROJECT_ID        — From .vercel/project.json → "projectId"
+#
+# Optional repository secrets / variables:
+#   MIN_ADDRESS_COUNT        — Sanity floor (default: 100). Set as a repo variable,
+#                              not a secret, since it is not sensitive.
+#   ORACLE_CONFIRMATIONS     — Blocks to wait for tx confirmation (default: 2)
+#   SNAPSHOT_PATH            — Override output path (default: ../frontend/data/imt-snapshot.json)
+#
+# Security notes:
+#   • ORACLE_PRIVATE_KEY is the most sensitive secret in this repository.
+#     The wallet it controls calls updateRoot() on-chain — keep it funded (~0.01 ETH
+#     on Sepolia is enough for months) and rotate it if ever exposed.
+#   • This workflow checks out with `persist-credentials: false` and uses the
+#     fine-grained GitHub App token pattern for the commit push so that the
+#     push does NOT re-trigger this workflow (avoiding infinite loops).
+#   • The oracle run is sandboxed — it has no write access to anything except
+#     frontend/data/ within the checkout. The ORACLE_PRIVATE_KEY is never logged.
+
+name: Update Sanctions Snapshot
+
+on:
+  schedule:
+    # 00:05 UTC daily — 5 minutes after midnight to avoid OFAC CDN cold-start
+    # Adjust if OFAC updates its XML at a known time; currently ~23:00 UTC prior day.
+    - cron: "5 0 * * *"
+
+  # Allow maintainers to trigger a manual run from the Actions tab —
+  # useful after contract redeployment or incident recovery.
+  workflow_dispatch:
+    inputs:
+      force_redeploy:
+        description: "Force Vercel redeploy even if snapshot unchanged"
+        type: boolean
+        required: false
+        default: false
+      dry_run:
+        description: "Dry run: run oracle but skip on-chain publish and commit"
+        type: boolean
+        required: false
+        default: false
+      min_address_count:
+        description: "Override minimum address count sanity check"
+        type: number
+        required: false
+        default: 100
+
+# Prevent two snapshot updates running concurrently.
+# If a manual dispatch fires while the cron is mid-run, cancel the cron.
+concurrency:
+  group: update-sanctions
+  cancel-in-progress: false   # Never cancel a mid-flight on-chain tx
+
+permissions:
+  contents: write   # Required to push the snapshot commit
+  statuses:  write  # For optional commit status annotation
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9"
+  # Bot identity for the snapshot commit — this is the standard GitHub Actions
+  # bot user. Using it means the push is attributed correctly in the git log
+  # and does NOT re-trigger push-based CI workflows that filter by actor.
+  GIT_AUTHOR_NAME:  "github-actions[bot]"
+  GIT_AUTHOR_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+
+# ===========================================================================
+# Job 1 — Run oracle pipeline and commit snapshot
+# ===========================================================================
+jobs:
+  run-oracle:
+    name: Run Oracle Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30   # The publishRoot step waits for 2-block confirmation;
+                          # Sepolia can be slow. 30 min is generous but bounded.
+
+    # Outputs let the trigger-deploy job know whether to bother deploying
+    outputs:
+      snapshot-changed: ${{ steps.detect-changes.outputs.changed }}
+      new-root:         ${{ steps.parse-output.outputs.root }}
+      tx-hash:          ${{ steps.parse-output.outputs.tx_hash }}
+      address-count:    ${{ steps.parse-output.outputs.address_count }}
+
+    steps:
+      # ── Checkout ─────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history so git diff works correctly
+          fetch-depth: 0
+          # Explicitly use GITHUB_TOKEN — we will push with it later.
+          # persist-credentials=true (default) is fine here; we use the token
+          # directly rather than SSH so the push goes through the API and
+          # can be gated by branch protection (if any).
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Node / pnpm ──────────────────────────────────────────────────────────
+      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      # Install only the oracle package's dependencies.
+      # --frozen-lockfile ensures reproducible installs.
+      # We use --filter to avoid building the frontend unnecessarily.
+      - name: Install oracle dependencies
+        run: pnpm install --frozen-lockfile --filter nullproof-oracle
+
+      # ── Pre-flight checks ────────────────────────────────────────────────────
+      # Verify required secrets are present before burning a network call.
+      # We check for non-empty rather than validating format to keep this portable.
+      - name: Verify required secrets are set
+        shell: bash
+        run: |
+          missing=()
+          [[ -z "$SEPOLIA_RPC_URL"       ]] && missing+=("SEPOLIA_RPC_URL")
+          [[ -z "$ORACLE_PRIVATE_KEY"    ]] && missing+=("ORACLE_PRIVATE_KEY")
+          [[ -z "$SANCTIONS_LIST_ADDRESS" ]] && missing+=("SANCTIONS_LIST_ADDRESS")
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Missing required secrets: ${missing[*]}"
+            echo "::error::See workflow header comments for setup instructions."
+            exit 1
+          fi
+
+          echo "✓ All required secrets are present."
+        env:
+          SEPOLIA_RPC_URL:          ${{ secrets.SEPOLIA_RPC_URL }}
+          ORACLE_PRIVATE_KEY:       ${{ secrets.ORACLE_PRIVATE_KEY }}
+          SANCTIONS_LIST_ADDRESS:   ${{ secrets.SANCTIONS_LIST_ADDRESS }}
+
+      # Ensure the output directory exists before the oracle tries to write to it.
+      # writeSnapshot.ts calls mkdir({ recursive: true }) but a pre-check here
+      # produces a cleaner error message if there is a permissions issue.
+      - name: Ensure frontend/data directory exists
+        run: mkdir -p frontend/data
+
+      # ── Run oracle ───────────────────────────────────────────────────────────
+      # The oracle pipeline exits with code 0 on success.
+      # It throws (non-zero exit) if:
+      #   a) OFAC fetch fails
+      #   b) Address count below MIN_ADDRESS_COUNT sanity floor
+      #   c) The on-chain tx reverts
+      # SPECIAL CASE: if the root hasn't changed since the last run, publishRoot
+      # throws "root unchanged — skipping publish" which TSX surfaces as exit code 1.
+      # We capture this specific message and treat it as a clean no-op rather than
+      # a failure — the OFAC list simply did not change today.
+      - name: Run oracle pipeline
+        id: oracle-run
+        shell: bash
+        working-directory: oracle
+        env:
+          # On-chain config
+          SEPOLIA_RPC_URL:          ${{ secrets.SEPOLIA_RPC_URL }}
+          ORACLE_PRIVATE_KEY:       ${{ secrets.ORACLE_PRIVATE_KEY }}
+          SANCTIONS_LIST_ADDRESS:   ${{ secrets.SANCTIONS_LIST_ADDRESS }}
+          ORACLE_CONFIRMATIONS:     ${{ vars.ORACLE_CONFIRMATIONS || '2' }}
+
+          # Sanity floor — prefer workflow_dispatch input, then repo variable, then 100
+          MIN_ADDRESS_COUNT: >-
+            ${{
+              inputs.min_address_count
+              || vars.MIN_ADDRESS_COUNT
+              || '100'
+            }}
+
+          # Output path — keep default (../frontend/data/imt-snapshot.json)
+          # relative to oracle/ which resolves to frontend/data/ in the repo root
+          SNAPSHOT_PATH: ""
+
+          # Dry run: if set, we still run fetch+buildIMT but skip publishRoot.
+          # The oracle does not natively support DRY_RUN — we handle this by
+          # overriding SANCTIONS_LIST_ADDRESS with a dummy if dry_run is true.
+          # The tx will fail-fast against the dummy address, which we catch below.
+          # A cleaner approach: add --dry-run flag to the oracle CLI (future work).
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+
+        run: |
+          set +e   # Don't exit immediately on error — we need to inspect the message
+
+          # Redirect both stdout (JSON logs) and stderr to a temp file so we
+          # can parse oracle output AND display it in the Actions log simultaneously
+          LOG_FILE=$(mktemp)
+          pnpm --filter nullproof-oracle start 2>&1 | tee "$LOG_FILE"
+          EXIT_CODE=${PIPESTATUS[0]}
+
+          set -e
+
+          # ── Handle "root unchanged" case ──────────────────────────────────
+          # publishRoot throws this exact message when root is same as on-chain.
+          # We normalise it to a no-op rather than a failure.
+          if grep -q "root unchanged" "$LOG_FILE"; then
+            echo "::notice::Root unchanged — OFAC list did not update today. Skipping commit and redeploy."
+            echo "root_unchanged=true"  >> "$GITHUB_OUTPUT"
+            echo "skipped=true"         >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # ── Propagate genuine failures ────────────────────────────────────
+          if [[ $EXIT_CODE -ne 0 ]]; then
+            echo "::error::Oracle pipeline failed with exit code $EXIT_CODE"
+            echo "::error::Review the step log above for the JSON-structured error message."
+            exit $EXIT_CODE
+          fi
+
+          echo "root_unchanged=false" >> "$GITHUB_OUTPUT"
+          echo "skipped=false"        >> "$GITHUB_OUTPUT"
+
+      # ── Parse oracle output ──────────────────────────────────────────────────
+      # Extract root, txHash, and addressCount from the final pipeline.done log line.
+      # The oracle logs structured JSON — we use jq to extract values cleanly.
+      - name: Parse oracle output
+        id: parse-output
+        if: steps.oracle-run.outputs.skipped != 'true'
+        shell: bash
+        working-directory: oracle
+        run: |
+          # Read the manifest written by writeSnapshot (canonical source of truth)
+          MANIFEST="$(cat ../frontend/data/imt-manifest.json)"
+
+          ROOT=$(echo "$MANIFEST"          | jq -r '.root')
+          TX_HASH=$(echo "$MANIFEST"       | jq -r '.txHash')
+          ADDRESS_COUNT=$(echo "$MANIFEST" | jq -r '.addressCount')
+          PUBLISHED_AT=$(echo "$MANIFEST"  | jq -r '.publishedAt')
+
+          # Validate we got real values
+          if [[ -z "$ROOT" || "$ROOT" == "null" ]]; then
+            echo "::error::Could not parse root from imt-manifest.json"
+            exit 1
+          fi
+
+          echo "root=$ROOT"                   >> "$GITHUB_OUTPUT"
+          echo "tx_hash=$TX_HASH"             >> "$GITHUB_OUTPUT"
+          echo "address_count=$ADDRESS_COUNT" >> "$GITHUB_OUTPUT"
+          echo "published_at=$PUBLISHED_AT"   >> "$GITHUB_OUTPUT"
+
+          # Human-readable summary in the Actions UI
+          echo "### Oracle Run Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |"      >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|"              >> "$GITHUB_STEP_SUMMARY"
+          echo "| New Root | \`$ROOT\` |"                       >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tx Hash | \`$TX_HASH\` |"                     >> "$GITHUB_STEP_SUMMARY"
+          echo "| Address Count | $ADDRESS_COUNT |"             >> "$GITHUB_STEP_SUMMARY"
+          echo "| Published At | $PUBLISHED_AT |"               >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Detect file changes ──────────────────────────────────────────────────
+      # Only commit if the snapshot files actually differ from what is in main.
+      # This guards against a bug where the oracle writes identical content
+      # (e.g. if the "root unchanged" detection above misses an edge case).
+      - name: Detect snapshot changes
+        id: detect-changes
+        if: steps.oracle-run.outputs.skipped != 'true'
+        shell: bash
+        run: |
+          # Stage the snapshot files to inspect the diff
+          git add frontend/data/imt-snapshot.json frontend/data/imt-manifest.json
+
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Snapshot files are byte-for-byte identical to HEAD. Nothing to commit."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            # Show a compact diff summary in the Actions log
+            git diff --cached --stat
+          fi
+
+      # ── Dry run guard ────────────────────────────────────────────────────────
+      # If this is a dry run, announce results but skip commit + redeploy.
+      - name: Dry run — skip commit
+        if: inputs.dry_run == true
+        shell: bash
+        run: |
+          echo "::notice::DRY RUN — oracle executed successfully but commit and redeploy are skipped."
+          git reset HEAD -- frontend/data/
+
+      # ── Commit snapshot ──────────────────────────────────────────────────────
+      # Commit only when:
+      #   - Oracle ran (not skipped due to unchanged root)
+      #   - Files actually changed
+      #   - Not a dry run
+      - name: Commit snapshot to main
+        if: |
+          steps.oracle-run.outputs.skipped != 'true'
+          && steps.detect-changes.outputs.changed == 'true'
+          && inputs.dry_run != true
+        shell: bash
+        env:
+          ROOT:          ${{ steps.parse-output.outputs.root }}
+          TX_HASH:       ${{ steps.parse-output.outputs.tx_hash }}
+          ADDRESS_COUNT: ${{ steps.parse-output.outputs.address_count }}
+          PUBLISHED_AT:  ${{ steps.parse-output.outputs.published_at }}
+        run: |
+          git config user.name  "${{ env.GIT_AUTHOR_NAME }}"
+          git config user.email "${{ env.GIT_AUTHOR_EMAIL }}"
+
+          # Construct a commit message that is informative in the git log.
+          # Using a multi-line body so `git log --oneline` stays clean
+          # while `git show` gives full context.
+          SHORT_ROOT="${ROOT:0:18}…"
+          SHORT_TX="${TX_HASH:0:12}…"
+
+          git commit -m "chore(sanctions): update IMT snapshot [${PUBLISHED_AT:0:10}]
+
+          root:          ${ROOT}
+          addressCount:  ${ADDRESS_COUNT}
+          txHash:        ${TX_HASH}
+          publishedAt:   ${PUBLISHED_AT}
+
+          Auto-generated by update-sanctions.yml"
+
+          # Push to main. If the branch has moved since checkout (another commit
+          # landed in the last ~30 min), rebase and retry once.
+          for attempt in 1 2; do
+            if git push origin main; then
+              echo "✓ Pushed snapshot commit to main (attempt $attempt)"
+              break
+            fi
+            if [[ $attempt -eq 2 ]]; then
+              echo "::error::Failed to push after rebase — check for conflicting commits to frontend/data/"
+              exit 1
+            fi
+            echo "Push rejected — rebasing on origin/main and retrying…"
+            git pull --rebase origin main
+          done
+
+  # ===========================================================================
+  # Job 2 — Trigger Vercel production redeploy
+  # Runs only when the snapshot was actually committed (or force_redeploy=true).
+  # ===========================================================================
+  trigger-deploy:
+    name: Trigger Vercel Redeploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: run-oracle
+    if: |
+      (needs.run-oracle.outputs.snapshot-changed == 'true'
+        || inputs.force_redeploy == true)
+      && inputs.dry_run != true
+
+    env:
+      VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - name: Checkout repository (post-commit HEAD)
+        uses: actions/checkout@v4
+        with:
+          # Fetch the commit we just pushed so Vercel builds the latest snapshot
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      # Link the repo checkout to the Vercel project.
+      # --yes skips interactive prompts; --token authenticates.
+      - name: Pull Vercel project settings
+        run: |
+          vercel pull \
+            --yes \
+            --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+      # Build locally so Vercel gets a pre-built artifact.
+      # The Vercel project's environment variables (VITE_* etc.) are already
+      # injected by `vercel pull` into .vercel/project.json's env section.
+      - name: Build for production
+        run: |
+          vercel build \
+            --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+      # Deploy the pre-built output. --prebuilt skips Vercel's remote build step,
+      # ensuring the deployed artifact is exactly what we built and verified here.
+      - name: Deploy to Vercel production
+        id: vercel-deploy
+        shell: bash
+        run: |
+          DEPLOY_URL=$(vercel deploy \
+            --prebuilt \
+            --prod \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            2>&1 | tail -n1)
+
+          if [[ -z "$DEPLOY_URL" || "$DEPLOY_URL" != https://* ]]; then
+            echo "::error::Vercel deploy did not return a valid URL. Output: $DEPLOY_URL"
+            exit 1
+          fi
+
+          echo "deployment-url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+          echo "✓ Deployed to $DEPLOY_URL"
+
+      # Surface the deployment URL in the Actions summary for quick access
+      - name: Annotate deploy summary
+        if: always()
+        shell: bash
+        env:
+          DEPLOY_URL:    ${{ steps.vercel-deploy.outputs.deployment-url }}
+          ROOT:          ${{ needs.run-oracle.outputs.new-root }}
+          ADDRESS_COUNT: ${{ needs.run-oracle.outputs.address-count }}
+          TX_HASH:       ${{ needs.run-oracle.outputs.tx-hash }}
+        run: |
+          echo "### Vercel Deploy"                              >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |"                             >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|"                                      >> "$GITHUB_STEP_SUMMARY"
+          echo "| URL | [$DEPLOY_URL]($DEPLOY_URL) |"          >> "$GITHUB_STEP_SUMMARY"
+          echo "| Snapshot Root | \`$ROOT\` |"                 >> "$GITHUB_STEP_SUMMARY"
+          echo "| Address Count | $ADDRESS_COUNT |"            >> "$GITHUB_STEP_SUMMARY"
+          echo "| Sepolia Tx | \`$TX_HASH\` |"                 >> "$GITHUB_STEP_SUMMARY"

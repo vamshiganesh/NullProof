@@ -43,14 +43,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { wagmiConfig }  from "@/lib/wagmi";
 import { WalletSync }   from "@/hooks/useWallet";
-import { Sidebar }      from "@/components/layout/Sidebar";
 import { TopNav }       from "@/components/layout/TopNav";
 
 import { useWalletStore }   from "@/store/walletStore";
-import { useSanctionsStore } from "@/store/sanctionsStore";
 import { useWallet }         from "@/hooks/useWallet";
-
-import { useState }           from "react";
 import type { WalletBadgeProps } from "@/components/layout/TopNav";
 
 
@@ -152,49 +148,40 @@ function ScrollToTop() {
 // ---------------------------------------------------------------------------
 
 function AppShell() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-  
-    // Derive WalletBadgeProps from walletStore + wallet actions
-    const wallet = useWallet();
-    const networkState = useWalletStore((s) =>
-      s.isWrongNetwork ? "warning" : s.isConnected ? "live" : "idle"
-    );
-  
-    // Build the wallet prop TopNav expects
-    const walletBadge: WalletBadgeProps = {
-        ...(wallet.address ? { address: wallet.address } : {}),
-        connected:    wallet.isConnected,
-        onConnect:    wallet.connectMetaMask,
-        onDisconnect: wallet.disconnect,
-      };
-  
-    return (
-      <div className="flex h-dvh overflow-hidden bg-zinc-950">
-        <Sidebar />
-  
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <TopNav
-            wallet={walletBadge}
-            networkLabel="Sepolia"
-            networkState={networkState}
-            onMenuOpen={() => setSidebarOpen(true)}
-          />
-  
-          <main
-            id="main-content"
-            className="flex-1 overflow-y-auto overflow-x-hidden"
-            tabIndex={-1}
-          >
-            <WalletSync />
-            <ScrollToTop />
-            <Suspense fallback={<PageLoader />}>
-              <Outlet />
-            </Suspense>
-          </main>
-        </div>
-      </div>
-    );
-  }
+  const wallet = useWallet();
+  const networkState = useWalletStore((s) =>
+    s.isWrongNetwork ? "warning" : s.isConnected ? "live" : "idle"
+  );
+
+  const walletBadge: WalletBadgeProps = {
+    ...(wallet.address ? { address: wallet.address } : {}),
+    connected:    wallet.isConnected,
+    onConnect:    wallet.connectMetaMask,
+    onDisconnect: wallet.disconnect,
+  };
+
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#0d0d0d]">
+      <TopNav
+        wallet={walletBadge}
+        networkLabel="Sepolia"
+        networkState={networkState}
+      />
+
+      <main
+        id="main-content"
+        className="flex-1 overflow-y-auto overflow-x-hidden"
+        tabIndex={-1}
+      >
+        <WalletSync />
+        <ScrollToTop />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
+      </main>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Route tree

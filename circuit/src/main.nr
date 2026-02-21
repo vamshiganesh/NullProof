@@ -10,7 +10,7 @@ fn main(
     low_leaf_next_value: u64,
     low_leaf_next_index: u64,
     siblings: [Field; 20],
-    path_indices: [u1; 20],
+    path_indices: [bool; 20],
     root: pub Field,
 ) {
     assert_non_membership(

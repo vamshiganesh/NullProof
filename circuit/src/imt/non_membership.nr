@@ -23,7 +23,7 @@ pub fn assert_non_membership(
     low_leaf_next_value: u64,
     low_leaf_next_index: u64,
     siblings: [Field; 20],
-    path_indices: [u1; 20],
+    path_indices: [bool; 20],
     root: Field
 ) {
     let low_leaf = build_low_leaf(
@@ -47,7 +47,7 @@ pub fn verify_non_membership(
     low_leaf_next_value: u64,
     low_leaf_next_index: u64,
     siblings: [Field; 20],
-    path_indices: [u1; 20],
+    path_indices: [bool; 20],
     root: Field
 ) -> bool {
     let low_leaf = build_low_leaf(

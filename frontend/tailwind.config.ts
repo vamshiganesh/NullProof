@@ -10,22 +10,22 @@ export default {
     extend: {
       colors: {
         bg: {
-          DEFAULT: "#050816",
-          soft:    "#0b1020",
-          muted:   "#11182d",
-          panel:   "#0f172a",
-          elevated:"#162033",
+          DEFAULT: "#0d0d0d",
+          soft:    "#101010",
+          muted:   "#141414",
+          panel:   "#121212",
+          elevated:"#1a1a1a",
         },
         fg: {
-          DEFAULT: "#f8fafc",
-          muted:   "#94a3b8",
-          subtle:  "#64748b",
-          dim:     "#475569",
+          DEFAULT: "#ffffff",
+          muted:   "#a0a0a0",
+          subtle:  "#646464",
+          dim:     "#404040",
         },
         border: {
-          DEFAULT: "#1e293b",
-          soft:    "#243247",
-          strong:  "#334155",
+          DEFAULT: "#262626",
+          soft:    "#303030",
+          strong:  "#3c3c3c",
         },
         accent: {
           DEFAULT: "#22c55e",
@@ -44,11 +44,11 @@ export default {
         sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
-      boxShadow: {
-        panel:   "0 0 0 1px rgba(148,163,184,0.08), 0 12px 32px rgba(2,6,23,0.40)",
-        glow:    "0 0 0 1px rgba(34,197,94,0.18), 0 0 24px rgba(34,197,94,0.12)",
-        danger:  "0 0 0 1px rgba(239,68,68,0.18), 0 0 20px rgba(239,68,68,0.10)",
-      },
+        boxShadow: {
+          panel:   "0 0 0 1px rgba(255,255,255,0.06), 0 12px 32px rgba(0,0,0,0.50)",
+          glow:    "0 0 0 1px rgba(34,197,94,0.20), 0 0 24px rgba(34,197,94,0.12)",
+          danger:  "0 0 0 1px rgba(239,68,68,0.18), 0 0 20px rgba(239,68,68,0.10)",
+        },
       borderRadius: {
         xl:  "1rem",
         "2xl":"1.25rem",
@@ -84,12 +84,12 @@ export default {
         countUp:  "countUp 300ms ease-out",
         indeterminate: "indeterminate 1.4s ease-in-out infinite",
       },
-      backgroundImage: {
-        "panel-grid":
-          "linear-gradient(to right, rgba(148,163,184,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.06) 1px, transparent 1px)",
-        "accent-radial":
-          "radial-gradient(circle at center, rgba(34,197,94,0.18), rgba(34,197,94,0.00) 70%)",
-      },
+        backgroundImage: {
+          "panel-grid":
+            "linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)",
+          "accent-radial":
+            "radial-gradient(circle at center, rgba(34,197,94,0.14), rgba(34,197,94,0.00) 70%)",
+        },
       backgroundSize: {
         "panel-grid": "24px 24px",
       },

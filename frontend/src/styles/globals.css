@@ -6,20 +6,20 @@
   :root {
     color-scheme: dark;
 
-    --bg: 5 8 22;
-    --bg-soft: 11 16 32;
-    --bg-muted: 15 23 42;
-    --bg-panel: 15 18 24;
-    --bg-elevated: 22 32 51;
+    --bg: 13 13 13;
+    --bg-soft: 16 16 16;
+    --bg-muted: 20 20 20;
+    --bg-panel: 18 18 18;
+    --bg-elevated: 26 26 26;
 
-    --fg: 248 250 252;
-    --fg-muted: 148 163 184;
-    --fg-subtle: 100 116 139;
-    --fg-dim: 71 85 105;
+    --fg: 255 255 255;
+    --fg-muted: 160 160 160;
+    --fg-subtle: 100 100 100;
+    --fg-dim: 64 64 64;
 
-    --border: 30 41 59;
-    --border-soft: 36 50 71;
-    --border-strong: 51 65 85;
+    --border: 38 38 38;
+    --border-soft: 48 48 48;
+    --border-strong: 60 60 60;
 
     --accent: 34 197 94;
     --accent-soft: 74 222 128;
@@ -67,9 +67,7 @@
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
-    background:
-      radial-gradient(circle at top, rgba(34, 197, 94, 0.05), transparent 28%),
-      rgb(var(--bg));
+    background: rgb(var(--bg));
     color: rgb(var(--fg));
     font-family: Inter, system-ui, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;

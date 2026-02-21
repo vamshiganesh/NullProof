@@ -10,11 +10,11 @@
         "pnpm": ">=9.0.0"
     },
     "scripts": {
-        "dev": "pnpm --filter frontend dev",
-        "build": "pnpm --filter frontend build",
-        "preview": "pnpm --filter frontend preview",
-        "oracle:run": "pnpm --filter oracle run",
-        "oracle:dev": "pnpm --filter oracle dev",
+        "dev": "pnpm --filter nullproof-frontend dev",
+        "build": "pnpm --filter nullproof-frontend build",
+        "preview": "pnpm --filter nullproof-frontend preview",
+        "oracle:run": "pnpm --filter nullproof-oracle run",
+        "oracle:dev": "pnpm --filter nullproof-oracle dev",
         "circuit:compile": "bash scripts/build-circuit.sh",
         "circuit:test": "cd circuit && nargo test",
         "circuit:prove": "cd circuit && nargo prove",

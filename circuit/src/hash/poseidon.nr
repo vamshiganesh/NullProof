@@ -17,12 +17,12 @@ pub fn hash_triple(a: Field, b: Field, c: Field) -> Field {
 pub fn compute_merkle_root(
     leaf_hash: Field,
     siblings: [Field; 20],
-    path_indices: [u1; 20]
+    path_indices: [bool; 20]
 ) -> Field {
     let mut current = leaf_hash;
 
     for i in 0..20 {
-        if path_indices[i] == 0 {
+        if !path_indices[i] {
             current = hash_pair(current, siblings[i]);
         } else {
             current = hash_pair(siblings[i], current);
@@ -35,7 +35,7 @@ pub fn compute_merkle_root(
 pub fn fold_merkle_path(
     leaf_hash: Field,
     siblings: [Field; 20],
-    path_indices: [u1; 20]
+    path_indices: [bool; 20]
 ) -> Field {
     compute_merkle_root(leaf_hash, siblings, path_indices)
 }

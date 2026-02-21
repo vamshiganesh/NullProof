@@ -31,7 +31,7 @@ pub fn assert_valid_leaf_structure(leaf: IndexedLeaf) {
 pub fn compute_leaf_root(
     leaf: IndexedLeaf,
     siblings: [Field; 20],
-    path_indices: [u1; 20]
+    path_indices: [bool; 20]
 ) -> Field {
     let leaf_hash = commit_leaf(leaf);
     compute_merkle_root(leaf_hash, siblings, path_indices)
@@ -40,7 +40,7 @@ pub fn compute_leaf_root(
 pub fn verify_membership(
     leaf: IndexedLeaf,
     siblings: [Field; 20],
-    path_indices: [u1; 20],
+    path_indices: [bool; 20],
     expected_root: Field
 ) -> bool {
     assert_valid_leaf_structure(leaf);
@@ -51,7 +51,7 @@ pub fn verify_membership(
 pub fn assert_membership(
     leaf: IndexedLeaf,
     siblings: [Field; 20],
-    path_indices: [u1; 20],
+    path_indices: [bool; 20],
     expected_root: Field
 ) {
     assert_valid_leaf_structure(leaf);

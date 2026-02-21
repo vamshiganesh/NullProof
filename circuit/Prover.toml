@@ -28,26 +28,26 @@ siblings = [
 ]
 
 path_indices = [
-  0,
-  1,
-  0,
-  1,
-  0,
-  1,
-  0,
-  1,
-  0,
-  1,
-  0,
-  1,
-  0,
-  1,
-  0,
-  1,
-  0,
-  1,
-  0,
-  1
+  false,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true
 ]
 
 root = "7412498451098114153722882743440663316096342290579319832354907016"

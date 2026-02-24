@@ -1,0 +1,55 @@
+name: Refresh OFAC Snapshot
+
+# Fetches the live OFAC SDN list every 24h, rebuilds the circuit-exact Indexed
+# Merkle Tree snapshot, and commits it so the in-browser prover always checks
+# against current sanctions data.
+
+on:
+  schedule:
+    # 00:15 UTC daily — shortly after OFAC's typical publish window.
+    - cron: "15 0 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-snapshot
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build sanctions snapshot from live OFAC feed
+        run: pnpm snapshot
+
+      - name: Commit updated snapshot
+        run: |
+          git config user.name  "nullproof-bot"
+          git config user.email "bot@nullproof.local"
+          if git diff --quiet -- frontend/public/data/sanctions-imt.json; then
+            echo "No changes to the sanctions snapshot."
+            exit 0
+          fi
+          git add frontend/public/data/sanctions-imt.json
+          ADDR_COUNT=$(node -e "console.log(require('./frontend/public/data/sanctions-imt.json').addressCount)")
+          git commit -m "chore(snapshot): refresh OFAC sanctions data (${ADDR_COUNT} addresses)"
+          git push

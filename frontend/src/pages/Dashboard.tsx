@@ -138,7 +138,7 @@ function WrongNetworkBanner() {
 // Compliance status hero card
 // ---------------------------------------------------------------------------
 
-type ComplianceState = "active" | "expired" | "none";
+type ComplianceState = "active" | "ready" | "expired" | "none";
 
 function StatusCard({
   state,
@@ -168,6 +168,17 @@ function StatusCard({
       badgeText:   "ACTIVE",
       sub:         countdown !== null && countdown > 0 ? formatCountdown(countdown) : "Expiring now…",
       barCls:      "bg-[#22c55e]",
+    },
+    ready: {
+      borderCls:   "border-[#22c55e]/15",
+      bg:          "bg-[#0d1410]",
+      dotCls:      "bg-[#22c55e]/60",
+      labelCls:    "text-[#4ade80]",
+      label:       "Proof Ready — Submit to Chain",
+      badge:       "border-[#22c55e]/20 bg-[#22c55e]/8 text-[#4ade80]",
+      badgeText:   "PROOF READY",
+      sub:         "ZK proof generated · Submit to activate on-chain compliance",
+      barCls:      "bg-[#22c55e]/60",
     },
     expired: {
       borderCls:   "border-amber-500/20",
@@ -246,30 +257,22 @@ function StatusCard({
           </div>
         </div>
 
-        {/* Right: CTA */}
-        <div className="shrink-0">
-          {state === "active" ? (
+        {/* Right: CTA — only shown when there's an active or ready proof */}
+        {(state === "active" || state === "ready") && (
+          <div className="shrink-0">
             <Link
               to="/app/ledger"
               className="inline-flex items-center gap-2 rounded-lg border border-[#262626] bg-[#1a1a1a] px-4 py-2 text-xs font-semibold text-[#a0a0a0] transition-colors hover:border-[#3e3e3e] hover:text-white focus-visible:outline-none"
             >
-              View Ledger
+              {state === "ready" ? "Submit Proof" : "View Ledger"}
               <ArrowSmIcon className="h-3 w-3" />
             </Link>
-          ) : (
-            <Link
-              to="/app/ledger"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#22c55e] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#16a34a] focus-visible:outline-none"
-            >
-              Generate Proof
-              <ArrowSmIcon className="h-3 w-3" />
-            </Link>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Progress bar */}
-      {state === "active" && (
+      {(state === "active" || state === "ready") && (
         <div className="mt-5">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="font-mono text-[10px] text-[#646464]">Validity window</span>
@@ -432,7 +435,9 @@ export function Dashboard() {
   const submission    = useProofStore(selectSubmission);
   const elapsedLabel  = useProofStore(selectElapsedLabel);
 
-  const confirmedAt   = submission?.confirmedAt ?? null;
+  // When confirmed use submission time; when proof is generated-but-not-yet-submitted
+  // fall back to the proof's own generatedAt so the validity window renders correctly.
+  const confirmedAt   = submission?.confirmedAt ?? proofResult?.generatedAt ?? null;
   const secsLeft      = secondsRemaining(confirmedAt);
 
   const complianceState: ComplianceState =
@@ -440,6 +445,8 @@ export function Dashboard() {
       ? "active"
       : proofStatus === "confirmed"
       ? "expired"
+      : proofStatus === "generated" && proofResult !== null
+      ? "ready"
       : "none";
 
   const nullifierShort = proofResult?.nullifier

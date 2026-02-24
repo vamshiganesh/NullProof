@@ -1,0 +1,382 @@
+{
+  "source": "https://www.treasury.gov/ofac/downloads/sdn.xml",
+  "fetchedAt": "2026-06-14T10:40:28.902Z",
+  "builtAt": "2026-06-14T10:40:31.282Z",
+  "depth": 20,
+  "addressCount": 93,
+  "root": "0x1e881d272f128d6794f7bf56f9823943dc54c7db6e2c17add5888b10c7a5d843",
+  "entries": [
+    {
+      "address": "0x72a5843cc08275C8171E582972Aa4fDa8C397B2A",
+      "value": "86791033561678253"
+    },
+    {
+      "address": "0x8576aCC5C05D6Ce88f4e49bf65BdF0C62F91353C",
+      "value": "297737489422470551"
+    },
+    {
+      "address": "0x797d7Ae72EbddCDea2a346c1834E04d1F8dF102b",
+      "value": "436251427109577719"
+    },
+    {
+      "address": "0xdcbEfFBECcE100cCE9E4b153C4e15cB885643193",
+      "value": "551054862676428701"
+    },
+    {
+      "address": "0x21B8d56BDA776bbE68655A16895afd96F5534feD",
+      "value": "710967607406273695"
+    },
+    {
+      "address": "0xC455f7fd3e0e12afd51fba5c106909934D8A0e4a",
+      "value": "760460425293203812"
+    },
+    {
+      "address": "0x7Db418b5D567A4e0E8c59Ad71BE1FcE48f3E6107",
+      "value": "826212362893351492"
+    },
+    {
+      "address": "0x9Be599d7867f5E1a2D7Ec6dB9710dF2b98A15573",
+      "value": "926624160835839517"
+    },
+    {
+      "address": "0x931546D9e66836AbF687d2bc64B30407bAc8C568",
+      "value": "1007230720095365551"
+    },
+    {
+      "address": "0xE1D865c3D669dCc8c57c8D023140CB204e672ee4",
+      "value": "1037538808655999902"
+    },
+    {
+      "address": "0xD8500C631dC32FA18645B7436344a99E4825e10e",
+      "value": "1627251547959438693"
+    },
+    {
+      "address": "0x32dA24Ca413F3E7B53145D4737e172C3bdF81e3e",
+      "value": "1701129570629431593"
+    },
+    {
+      "address": "0x5D5b5dAfecBF31BDb08bFd3eDad4f2694372d0ef",
+      "value": "1789923128274467717"
+    },
+    {
+      "address": "0x43fa21d92141BA9db43052492E0DeEE5aa5f0A93",
+      "value": "2008672363359023298"
+    },
+    {
+      "address": "0x530A64c0Ce595026a4A556b703644228179E2d57",
+      "value": "2075916479282048053"
+    },
+    {
+      "address": "0xd5ED34b52AC4ab84d8FA8A231a3218bbF01Ed510",
+      "value": "2122974954966356962"
+    },
+    {
+      "address": "0x3e37627dEAA754090fBFbb8bd226c1CE66D255e9",
+      "value": "2497547262053335490"
+    },
+    {
+      "address": "0xEFE301d259F525cA1ba74A7977b80D5b060B3ccA",
+      "value": "2680106649026854608"
+    },
+    {
+      "address": "0x19F8f2B0915Daa12a3f5C9CF01dF9E24D53794F7",
+      "value": "2792470927618687972"
+    },
+    {
+      "address": "0xDb2720ebAd55399117ddB4C4a4afd9a4CCAda8fE",
+      "value": "2895358705208191995"
+    },
+    {
+      "address": "0x098B716B8Aaf21512996dC57EB0615e2383E2f96",
+      "value": "2909863340383491612"
+    },
+    {
+      "address": "0x1999EF52700c34De7EC2b68a28aAFB37db0C5ade",
+      "value": "2927238009215975428"
+    },
+    {
+      "address": "0x9C2Bc757B66F24D60F016B6237F8CdD414a879Fa",
+      "value": "2939000463367288492"
+    },
+    {
+      "address": "0x8Dce2aAC0dE82bdCAf6b4373B79f94331b8e4995",
+      "value": "3721736844181691356"
+    },
+    {
+      "address": "0xcB74874f1e06Fcf80A306e06e5379A44B488bA2D",
+      "value": "3882137497389224817"
+    },
+    {
+      "address": "0x747AFB5c7A7fc34B547cD0FDEbf9b91759C5a52b",
+      "value": "3932619746045550718"
+    },
+    {
+      "address": "0x532B77B33A040587e9FD1800088225f99b8B0E8A",
+      "value": "4158012771253165335"
+    },
+    {
+      "address": "0x95584C303FCd48AF5c6B9873015f2AD0ca84EaE3",
+      "value": "4331112896955858002"
+    },
+    {
+      "address": "0xE1E4C5e5Ed8F03Ae61b581e2dEf126025F2b9401",
+      "value": "4504498415683744630"
+    },
+    {
+      "address": "0x5512d943eD1f7c8a43F3435C85F7aB68b30121b0",
+      "value": "5799787213024345900"
+    },
+    {
+      "address": "0x14779CEC0B117d5194c750C55Ea1f42086631964",
+      "value": "5815711987554706223"
+    },
+    {
+      "address": "0x83E5bC4Ffa856BB84Bb88581f5Dd62A433A25e0D",
+      "value": "5945335965652181783"
+    },
+    {
+      "address": "0x39D908dac893CBCB53Cc86e0ECc369aA4DeF1A29",
+      "value": "6020694453138926800"
+    },
+    {
+      "address": "0x5A14E72060c11313E38738009254a90968F58f51",
+      "value": "6029703623336651253"
+    },
+    {
+      "address": "0x7F367cC41522cE07553e823bf3be79A889DEbe1B",
+      "value": "6330328686468780746"
+    },
+    {
+      "address": "0x67d40EE1A85bf4a4Bb7Ffae16De985e8427B6b45",
+      "value": "6351083326644065123"
+    },
+    {
+      "address": "0xb637F84b66876ebf609C2A4208905F9ddAC9d075",
+      "value": "6522775269241238876"
+    },
+    {
+      "address": "0xd882cFc20F52f2599D84b8e8D58C7FB62cfE344b",
+      "value": "6830182629031320556"
+    },
+    {
+      "address": "0xA7e5d5A720f06526557c513402f2e6B5fA20b008",
+      "value": "6943526330786560833"
+    },
+    {
+      "address": "0x6F1cA141A28907F78Ebaa64fb83A9088b02A8352",
+      "value": "6969939566156123591"
+    },
+    {
+      "address": "0xb338962B92CD818D6aef0A32a9ECD01212a71f33",
+      "value": "7111892839540254620"
+    },
+    {
+      "address": "0x0Ee5067b06776A89CcC7dC8Ee369984AD7Db5e06",
+      "value": "7312393111908462801"
+    },
+    {
+      "address": "0x53b6936513e738f44FB50d2b9476730C0Ab3Bfc1",
+      "value": "7436371914375457525"
+    },
+    {
+      "address": "0x4F428c11Dc82388fa5136D636e613ad923Eb700B",
+      "value": "7576357986730587277"
+    },
+    {
+      "address": "0x6Be0aE71e6c41f2f9D0D1A3B8d0f75E6f6A0b46e",
+      "value": "7688477013238764910"
+    },
+    {
+      "address": "0x04DBA1194ee10112fE6C3207C0687DEf0e78baCf",
+      "value": "7846934884248273593"
+    },
+    {
+      "address": "0x57EC89A0C056163A0314e413320f9B3ABe761259",
+      "value": "8372352105796601162"
+    },
+    {
+      "address": "0xf3701F445b6BDaFeDbcA97D1e477357839e4120D",
+      "value": "8480371958208962256"
+    },
+    {
+      "address": "0x4F47Bc496083C727c5fbe3CE9CDf2B0f6496270c",
+      "value": "8642696020906868150"
+    },
+    {
+      "address": "0x308eD4B7b49797e1A98D3818bFF6fe5385410370",
+      "value": "8724695012995035243"
+    },
+    {
+      "address": "0x08b2eFdcdB8822EfE5ad0Eae55517cf5DC544251",
+      "value": "9114686758256958659"
+    },
+    {
+      "address": "0x1967D8Af5Bd86A497fb3DD7899A020e47560dAAF",
+      "value": "9201764092849043932"
+    },
+    {
+      "address": "0x0931cA4D13BB4ba75D9B7132AB690265D749a5E7",
+      "value": "9531194344216253077"
+    },
+    {
+      "address": "0x7CEd75026204aC29C34bEA98905D4C949F27361e",
+      "value": "9538073953477632897"
+    },
+    {
+      "address": "0xf4377edA661e04B6DDA78969796Ed31658D602D4",
+      "value": "9637991534401851420"
+    },
+    {
+      "address": "0x983a81ca6FB1e441266D2FbcB7D8E530AC2E05A2",
+      "value": "9832388685543425400"
+    },
+    {
+      "address": "0x901bb9583b24D97e995513C6778dc6888AB6870e",
+      "value": "10303702789318995739"
+    },
+    {
+      "address": "0xaC4cC4B68ea24BbFAAC8fD127B67Ed445ACcCE22",
+      "value": "10366270043074052490"
+    },
+    {
+      "address": "0xF2235D55b2950a0B1317469d72d07Ae65b2e27CB",
+      "value": "10400097839821317437"
+    },
+    {
+      "address": "0xFb3eFf152ea55D1BfA04Dbdd509A80fD7b72cdEB",
+      "value": "11318815803855840844"
+    },
+    {
+      "address": "0x76EA76CA4Eb727f18956aB93445a94c5280412B9",
+      "value": "11434707945106254545"
+    },
+    {
+      "address": "0x1da5821544e25c636c1417Ba96Ade4Cf6D2f9B5A",
+      "value": "11900601024927313420"
+    },
+    {
+      "address": "0x19Aa5Fe80D33a56D56c78e82eA5E50E5d80b4Dff",
+      "value": "12189962039752091709"
+    },
+    {
+      "address": "0xeD6e0A7e4Ac94D976eeBfB82ccf777A3c6baD921",
+      "value": "12336533383868410384"
+    },
+    {
+      "address": "0xF7B31119c2682c88d88D455dBb9d5932c65Cf1bE",
+      "value": "12383787997770604924"
+    },
+    {
+      "address": "0xb6f5ec1A0a9cd1526536D3F0426c429529471F40",
+      "value": "12388227218302379902"
+    },
+    {
+      "address": "0x35fB6f6DB4fb05e6A4cE86f2C93691425626d4b1",
+      "value": "12456554836333533190"
+    },
+    {
+      "address": "0x48549A34AE37b12F6a30566245176994e17C6b4A",
+      "value": "12476054285697225984"
+    },
+    {
+      "address": "0x7F19720A857F834887FC9A7bC0a0fBe7Fc7f8102",
+      "value": "12576600125307359141"
+    },
+    {
+      "address": "0x3Cffd56B47B7b41c56258D9C7731ABaDc360E073",
+      "value": "12638161706423123207"
+    },
+    {
+      "address": "0xc2a3829F459B3Edd87791c74cD45402BA0a20Be3",
+      "value": "13429750802730217412"
+    },
+    {
+      "address": "0xe7aa314c77F4233C18C6CC84384A9247c0cf367B",
+      "value": "13615107966335187030"
+    },
+    {
+      "address": "0x502371699497d08D5339c870851898D6D72521Dd",
+      "value": "13691042804241980690"
+    },
+    {
+      "address": "0xa0e1c89Ef1a489c9C7dE96311eD5Ce5D32c20E4B",
+      "value": "13827410604517951099"
+    },
+    {
+      "address": "0xFda1Ec4A6178d4916b001a065422D31EBE5F62FF",
+      "value": "14021901520972156734"
+    },
+    {
+      "address": "0x3CBdeD43EFdAf0FC77b9C55F6fC9988fCC9b757d",
+      "value": "14382488568209533131"
+    },
+    {
+      "address": "0x0330070FD38Ec3bB94F58FA55D40368271E9e54A",
+      "value": "14726158107732449656"
+    },
+    {
+      "address": "0xc103B7Dc095c904b92081EEF0C1640081ec01c10",
+      "value": "15247447050373477924"
+    },
+    {
+      "address": "0xD0975B32cEa532eaDDdFC9c60481976e39dB3472",
+      "value": "15319735943999411484"
+    },
+    {
+      "address": "0xE3D35f68383732649669aA990832E017340DbcA5",
+      "value": "15413996555189151614"
+    },
+    {
+      "address": "0x08723392Ed15743cc38513C4925f5e6be5c17243",
+      "value": "15726832221979586310"
+    },
+    {
+      "address": "0x2f389cE8bD8ff92De3402FFCe4691d17fC4f6535",
+      "value": "15790318262557081632"
+    },
+    {
+      "address": "0x9F4cda013E354b8fC285BF4b9A60460cEe7f7Ea9",
+      "value": "15997812813123785649"
+    },
+    {
+      "address": "0xd04E33461FEA8302c5E1e13895b60cEe8AEfda7F",
+      "value": "16506018771581895708"
+    },
+    {
+      "address": "0x3AD9dB589d201A710Ed237c829c7860Ba86510Fc",
+      "value": "16908842987547343482"
+    },
+    {
+      "address": "0x961C5Be54a2ffC17CF4Cb021d863c42daCd47Fc1",
+      "value": "17054408544615676058"
+    },
+    {
+      "address": "0x97B1043ABD9E6FC31681635166d430a458D14F9C",
+      "value": "17117078033683441325"
+    },
+    {
+      "address": "0x038989cBB1710C72b9920Dc4Fa529158f463e72c",
+      "value": "17313721243687277004"
+    },
+    {
+      "address": "0x5A7a51bFb49F190e5A6060a5bc6052Ac14a3b59f",
+      "value": "17378344048368690461"
+    },
+    {
+      "address": "0x5f48C2A71B2CC96e3F0CCae4E39318Ff0dc375b2",
+      "value": "17391192850092481570"
+    },
+    {
+      "address": "0xE950DC316b836e4EeFb8308bf32Bf7C72a1358FF",
+      "value": "17453724974725357777"
+    },
+    {
+      "address": "0x7FF9cFad3877F21d41Da833E2F775dB0569eE3D9",
+      "value": "18001869099572557043"
+    },
+    {
+      "address": "0x12de548F79a50D2bd05481C8515C1eF5183666a9",
+      "value": "18126150843130515653"
+    }
+  ]
+}

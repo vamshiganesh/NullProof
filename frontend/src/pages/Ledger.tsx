@@ -229,8 +229,10 @@ function ValidityCountdown({ generatedAt }: { generatedAt: number }) {
 // ---------------------------------------------------------------------------
 
 function NullifierStatus({ nullifier }: { nullifier: Hex }) {
-  const used    = useIsNullifierUsed(nullifier);
-  const usedAt  = useNullifierUsedAt(nullifier);
+  const contractsDeployed = !!COMPLIANCE_GATE_ADDRESS;
+
+  const used    = useIsNullifierUsed(contractsDeployed ? nullifier : null);
+  const usedAt  = useNullifierUsedAt(contractsDeployed ? nullifier : null);
   const validity = useValidityWindow();
   const paused  = useSubmissionPaused();
 
@@ -239,6 +241,18 @@ function NullifierStatus({ nullifier }: { nullifier: Hex }) {
       ? new Date((Number(usedAt.data) + Number(validity.data)) * 1000)
       : null;
   const isExpired = expiresAt ? expiresAt < new Date() : false;
+
+  if (!contractsDeployed) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-[#1e1e1e] bg-[#0d0d0d] px-3.5 py-3">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#3e3e3e]" aria-hidden="true" />
+        <div>
+          <p className="text-[11px] text-[#646464]">Contracts not deployed on Sepolia testnet</p>
+          <p className="mt-0.5 font-mono text-[9px] text-[#3e3e3e]">On-chain state unavailable until contracts go live</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -499,6 +513,20 @@ export function Ledger() {
                     </span>
                   )}
                 </div>
+
+                {/* Contracts not deployed notice */}
+                {!COMPLIANCE_GATE_ADDRESS && (
+                  <div className="flex items-start gap-3 rounded-lg border border-[#1e1e1e] bg-[#0d0d0d] px-3.5 py-3">
+                    <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#646464]" />
+                    <div>
+                      <p className="text-[11px] font-semibold text-[#a0a0a0]">On-chain submission not yet available</p>
+                      <p className="mt-0.5 text-[10px] leading-relaxed text-[#646464]">
+                        The ComplianceGate contract has not been deployed to Sepolia testnet yet. Your proof
+                        is fully valid — submission will be enabled once contracts go live.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Root mismatch warning */}
                 {rootMismatch && (

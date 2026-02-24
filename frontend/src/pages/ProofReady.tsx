@@ -33,6 +33,7 @@ import {
   DEFAULT_VALIDITY_WINDOW_SECONDS,
   SUPPORTED_CHAIN_NAME,
   BLOCK_EXPLORER_URL,
+  COMPLIANCE_GATE_ADDRESS,
 } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
@@ -517,15 +518,29 @@ export function ProofReady() {
 
       {/* ── Action buttons ────────────────────────────────────────── */}
       <div className="flex flex-col gap-2.5">
+        {/* Contracts not deployed notice */}
+        {!isConfirmed && !COMPLIANCE_GATE_ADDRESS && (
+          <div className="flex items-start gap-3 rounded-xl border border-[#1e1e1e] bg-[#141414] px-4 py-3">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#646464]" />
+            <div>
+              <p className="text-[12px] font-semibold text-[#a0a0a0]">On-chain submission not yet available</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-[#646464]">
+                The ComplianceGate contract has not been deployed to Sepolia testnet. Your proof
+                is cryptographically valid — submission will be enabled once contracts are live.
+              </p>
+            </div>
+          </div>
+        )}
+
         {!isConfirmed && (
           <button
             onClick={handleSubmit}
-            disabled={!readyToSubmit || status === "submitting"}
+            disabled={!readyToSubmit || status === "submitting" || !COMPLIANCE_GATE_ADDRESS}
             className={[
               "relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl py-3.5 text-[14px] font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e]/50",
               status === "submitting"
                 ? "cursor-wait bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20"
-                : readyToSubmit && !rootMismatch
+                : readyToSubmit && !rootMismatch && COMPLIANCE_GATE_ADDRESS
                 ? "bg-[#22c55e] text-white hover:bg-[#16a34a]"
                 : "cursor-not-allowed border border-[#1e1e1e] bg-[#141414] text-[#3e3e3e]",
             ].join(" ")}
@@ -535,6 +550,8 @@ export function ProofReady() {
             )}
             {status === "submitting" ? (
               <><span className="h-4 w-4 animate-spin rounded-full border border-[#22c55e]/40 border-t-[#22c55e]" aria-hidden="true" />Awaiting Wallet Confirmation…</>
+            ) : !COMPLIANCE_GATE_ADDRESS ? (
+              <><ChainIcon className="h-4 w-4" />Submit Proof On-Chain (Contract not deployed)</>
             ) : (
               <><ChainIcon className="h-4 w-4" />Submit Proof On-Chain</>
             )}

@@ -78,9 +78,12 @@ export async function fetchOFACAddresses(
   const xml = response.data;
 
   // ── 2. Parse ───────────────────────────────────────────────────────────────
+  // parseTagValue:false keeps element text as strings instead of converting
+  // "0x..." Ethereum hex addresses to JavaScript numbers in scientific notation.
   const parser = new XMLParser({
     ignoreAttributes:        false,
     parseAttributeValue:     true,
+    parseTagValue:           false,
     isArray: (tagName) =>
       tagName === "sdnEntry" || tagName === "id",
   });

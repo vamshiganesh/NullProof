@@ -33,68 +33,80 @@ import type { ProveResult, WorkerOutMessage, WitnessData } from "@/lib/prover/pr
 // Web Worker hook
 // ---------------------------------------------------------------------------
 
-function useProofWorker() {
-  const workerRef = useRef<Worker | null>(null);
-
+// StrictMode-safe: the worker is created AND torn down inside a single effect
+// keyed on `address` + `runId`. This is critical — React StrictMode mounts,
+// unmounts, then remounts components in dev. A worker created in one effect but
+// terminated by a *separate* cleanup effect gets killed right after creation and
+// never restarts (the global "generating" status blocks the guard). Co-locating
+// create + terminate in one effect means the remount simply spins up a fresh
+// worker that runs to completion.
+function useProofWorker(address: string | null) {
   const {
     startGeneration, setStepActive, setStepDone,
     setStepError, setGenerated, setError, reset,
   } = useProofStore();
 
-  const status  = useProofStore(selectProofStatus);
-  const isBusy  = status === "generating";
   const [witnessData, setWitnessData] = useState<WitnessData | null>(null);
+  const [runId, setRunId] = useState(0);
 
-  const terminate = useCallback(() => {
-    if (workerRef.current) { workerRef.current.terminate(); workerRef.current = null; }
-  }, []);
+  useEffect(() => {
+    if (!address) return;
 
-  useEffect(() => () => terminate(), [terminate]);
+    let cancelled = false;
+    setWitnessData(null);
+    startGeneration();
 
-  const prove = useCallback(
-    (address: string) => {
-      if (isBusy) return;
-      terminate();
-      setWitnessData(null);
-      startGeneration();
+    const worker = new Worker(
+      new URL("../lib/prover/proofWorker.ts", import.meta.url),
+      { type: "module" },
+    );
 
-      const worker = new Worker(
-        new URL("../lib/prover/proofWorker.ts", import.meta.url),
-        { type: "module" },
-      );
-      workerRef.current = worker;
+    worker.onmessage = (e: MessageEvent<WorkerOutMessage>) => {
+      if (cancelled) return;
+      const msg = e.data;
+      if (msg.type === "STEP") {
+        const { stepId, state } = msg.payload;
+        if (state === "active")      setStepActive(stepId);
+        else if (state === "done")   setStepDone(stepId);
+        else if (state === "error")  setStepError(stepId);
+      }
+      // Witness arrives right after step-1 so the IMT tree lights up before proving
+      if (msg.type === "WITNESS") {
+        setWitnessData(msg.payload);
+      }
+      if (msg.type === "DONE") {
+        const r = msg.payload;
+        setWitnessData(r.witness);
+        setGenerated({
+          proof:        r.proofHex as `0x${string}`,
+          publicInputs: r.publicInputs as `0x${string}`[],
+          nullifier:    r.nullifier as `0x${string}`,
+          rootUsed:     r.rootUsed as `0x${string}`,
+          generatedAt:  r.generatedAt,
+        });
+      }
+      if (msg.type === "ERROR") setError(msg.payload.message);
+    };
 
-      worker.onmessage = (e: MessageEvent<WorkerOutMessage>) => {
-        const msg = e.data;
-        if (msg.type === "STEP") {
-          const { stepId, state } = msg.payload;
-          if (state === "active")      setStepActive(stepId);
-          else if (state === "done")   setStepDone(stepId);
-          else if (state === "error")  setStepError(stepId);
-        }
-        if (msg.type === "DONE") {
-          const r = msg.payload;
-          setWitnessData(r.witness);
-          setGenerated({
-            proof:        r.proofHex as `0x${string}`,
-            publicInputs: r.publicInputs as `0x${string}`[],
-            nullifier:    r.nullifier as `0x${string}`,
-            rootUsed:     r.rootUsed as `0x${string}`,
-            generatedAt:  r.generatedAt,
-          });
-          terminate();
-        }
-        if (msg.type === "ERROR") { setError(msg.payload.message); terminate(); }
-      };
+    worker.onerror = (e) => {
+      if (!cancelled) setError(e.message ?? "Worker crashed");
+    };
 
-      worker.onerror = (e) => { setError(e.message ?? "Worker crashed"); terminate(); };
-      worker.postMessage({ type: "PROVE", payload: { address } });
-    },
-    [isBusy, startGeneration, setStepActive, setStepDone, setStepError,
-     setGenerated, setError, terminate],
-  );
+    worker.postMessage({ type: "PROVE", payload: { address } });
 
-  return { prove, reset, isBusy, witnessData, terminate };
+    return () => {
+      cancelled = true;
+      worker.terminate();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, runId]);
+
+  const retry = useCallback(() => {
+    reset();
+    setRunId((n) => n + 1);
+  }, [reset]);
+
+  return { witnessData, retry };
 }
 
 // ---------------------------------------------------------------------------
@@ -102,10 +114,11 @@ function useProofWorker() {
 // ---------------------------------------------------------------------------
 
 interface IMTVisualizerProps {
-  address:    string | null;
-  witness:    WitnessData | null;
-  proofState: StepState | "idle";
-  rootHash:   string | null;
+  address:         string | null;
+  witness:         WitnessData | null;
+  proofState:      StepState | "idle";
+  rootHash:        string | null;
+  fetchingWitness: boolean;  // true while step-1 (witness) is active and tree is not yet ready
 }
 
 const DISPLAY_DEPTH = 5;
@@ -131,7 +144,10 @@ function buildVisTree(
   const levelH  = usableH / DISPLAY_DEPTH;
 
   const pathIndices = witness?.pathIndices ?? [];
-  const leafIndex   = witness?.leafIndex   ?? 0;
+  // The real low-leaf index can be anywhere in [0, 2^20). The visualizer only
+  // renders the top DISPLAY_DEPTH levels, so project onto the low DISPLAY_DEPTH
+  // path bits — these are the real direction bits for the bottom of the path.
+  const leafIndex   = (witness?.leafIndex ?? 0) % Math.pow(2, DISPLAY_DEPTH);
   const siblings    = witness?.merklePath  ?? [];
 
   const onPathIndexAtLevel: number[] = [];
@@ -188,11 +204,12 @@ function buildVisTree(
   return { nodes, edges };
 }
 
-function IMTVisualizer({ address, witness, proofState, rootHash }: IMTVisualizerProps) {
+function IMTVisualizer({ address, witness, proofState, rootHash, fetchingWitness }: IMTVisualizerProps) {
   const svgRef  = useRef<SVGSVGElement>(null);
-  const [dims, setDims]       = useState({ w: 520, h: 420 });
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [dims, setDims]         = useState({ w: 520, h: 420 });
+  const [hovered, setHovered]   = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [dotCount, setDotCount] = useState(0); // scanning dots animation
 
   useEffect(() => {
     const el = svgRef.current?.parentElement;
@@ -209,7 +226,16 @@ function IMTVisualizer({ address, witness, proofState, rootHash }: IMTVisualizer
     setRevealed(false);
   }, [witness]);
 
-  const { nodes, edges } = buildVisTree(witness, address, rootHash, dims.w, dims.h);
+  // Animate scanning dots in the overlay while waiting for witness
+  useEffect(() => {
+    if (!fetchingWitness) { setDotCount(0); return; }
+    const id = setInterval(() => setDotCount((n) => (n + 1) % 4), 400);
+    return () => clearInterval(id);
+  }, [fetchingWitness]);
+
+  // Prefer the witness's own root (most accurate); fall back to live sanctions root
+  const displayRoot = witness?.merkleRoot ?? rootHash;
+  const { nodes, edges } = buildVisTree(witness, address, displayRoot, dims.w, dims.h);
   const isProving = proofState === "active";
 
   return (
@@ -375,12 +401,26 @@ function IMTVisualizer({ address, witness, proofState, rootHash }: IMTVisualizer
         {/* Waiting overlay */}
         {!witness && (
           <g>
-            <text x={dims.w / 2} y={dims.h / 2 - 12} textAnchor="middle"
-              fontSize="12" fontFamily="sans-serif" fill="#3e3e3e">
-              Fetching Merkle witness…
+            {/* Pulsing ring while scanning */}
+            {fetchingWitness && (
+              <>
+                <circle cx={dims.w / 2} cy={dims.h / 2 - 32} r={22}
+                  fill="none" stroke="rgba(34,197,94,0.06)" strokeWidth="1" />
+                <circle cx={dims.w / 2} cy={dims.h / 2 - 32} r={14}
+                  fill="none" stroke="rgba(34,197,94,0.12)" strokeWidth="1" />
+                <circle cx={dims.w / 2} cy={dims.h / 2 - 32} r={7}
+                  fill="rgba(34,197,94,0.08)" stroke="rgba(34,197,94,0.35)" strokeWidth="1.2" />
+              </>
+            )}
+            <text x={dims.w / 2} y={dims.h / 2 + (fetchingWitness ? -4 : -12)}
+              textAnchor="middle" fontSize="12" fontFamily="sans-serif"
+              fill={fetchingWitness ? "rgba(34,197,94,0.55)" : "#3e3e3e"}>
+              {fetchingWitness
+                ? `Building IMT witness${".".repeat(dotCount)}`
+                : "Waiting for witness…"}
             </text>
-            <text x={dims.w / 2} y={dims.h / 2 + 10} textAnchor="middle"
-              fontSize="9" fontFamily="monospace" fill="#262626">
+            <text x={dims.w / 2} y={dims.h / 2 + (fetchingWitness ? 16 : 10)}
+              textAnchor="middle" fontSize="9" fontFamily="monospace" fill="#262626">
               {address ? formatHash(address, 8, 6) : "—"}
             </text>
           </g>
@@ -519,13 +559,57 @@ function StepRow({ step, isLast, elapsed }: { step: ProofStep; isLast: boolean; 
 // ---------------------------------------------------------------------------
 
 const CIRCUIT_STATS = [
-  { key: "Proving system",  val: "UltraHonk"       },
-  { key: "Backend",         val: "Barretenberg"     },
-  { key: "Language",        val: "Noir"             },
-  { key: "Gate count",      val: "~190,000"         },
+  { key: "Proving system",  val: "UltraHonk"              },
+  { key: "Backend",         val: "Barretenberg (WASM)"     },
+  { key: "Language",        val: "Noir 1.0.0-beta.22"      },
+  { key: "ACIR opcodes",    val: "240"                     },
   { key: "Merkle depth",    val: String(MERKLE_TREE_DEPTH) },
-  { key: "Public inputs",   val: "1 (Merkle root)"  },
+  { key: "Public inputs",   val: "1 (Merkle root)"         },
 ] as const;
+
+function formatAge(builtAt: string): { label: string; stale: boolean } {
+  const ms = Date.now() - new Date(builtAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return { label: "unknown", stale: false };
+  const hours = ms / 3_600_000;
+  const stale = hours > 24;
+  if (hours < 1)  return { label: `${Math.max(1, Math.round(ms / 60_000))}m ago`, stale };
+  if (hours < 24) return { label: `${Math.round(hours)}h ago`, stale };
+  return { label: `${Math.round(hours / 24)}d ago`, stale };
+}
+
+function SanctionsDataPanel({ witness }: { witness: WitnessData }) {
+  const age = formatAge(witness.builtAt);
+
+  const rows: { key: string; val: string; warn?: boolean }[] = [
+    { key: "Source",           val: "OFAC SDN list" },
+    { key: "Sanctioned addrs", val: String(witness.addressCount) },
+    { key: "Snapshot age",     val: age.label, warn: age.stale },
+    { key: "Your fingerprint", val: witness.queryValue.slice(0, 12) + "…" },
+  ];
+
+  return (
+    <div className="rounded-xl border border-[#1e1e1e] bg-[#141414]">
+      <div className="flex items-center gap-2.5 border-b border-[#1e1e1e] px-4 py-3">
+        <OracleIcon />
+        <span className="font-mono text-[11px] uppercase tracking-widest text-[#646464]">Live Sanctions Data</span>
+        <span className="ml-auto flex items-center gap-1 text-[10px]">
+          <span className="h-1 w-1 rounded-full bg-[#22c55e]" aria-hidden="true" />
+          <span className="text-[#22c55e]/70">real</span>
+        </span>
+      </div>
+      <div className="divide-y divide-[#1a1a1a]">
+        {rows.map(({ key, val, warn }) => (
+          <div key={key} className="flex items-center justify-between px-4 py-2.5">
+            <span className="text-[11px] text-[#646464]">{key}</span>
+            <span className={["font-mono text-[11px] font-semibold", warn ? "text-amber-400" : "text-[#a0a0a0]"].join(" ")}>
+              {val}{warn ? " · stale" : ""}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function CircuitStatsPanel() {
   return (
@@ -551,6 +635,10 @@ function CircuitStatsPanel() {
 // ---------------------------------------------------------------------------
 
 function ErrorPanel({ message, onRetry }: { message: string; onRetry: () => void }) {
+  // A sanctioned address is a *correct* outcome of the protocol, not a bug.
+  const isSanctioned = /sanctions list/i.test(message);
+  const heading = isSanctioned ? "Address flagged — non-membership disproven" : "Proof generation failed";
+
   return (
     <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
       <div className="flex items-start gap-3">
@@ -558,7 +646,7 @@ function ErrorPanel({ message, onRetry }: { message: string; onRetry: () => void
           <XIcon className="text-rose-400" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-rose-300">Proof generation failed</p>
+          <p className="text-sm font-semibold text-rose-300">{heading}</p>
           <p className="mt-1 break-all text-[11px] leading-relaxed text-rose-500/80">{message}</p>
         </div>
       </div>
@@ -576,10 +664,118 @@ function ErrorPanel({ message, onRetry }: { message: string; onRetry: () => void
 // ProofGenerate page
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Address checker input panel
+// ---------------------------------------------------------------------------
+
+function AddressCheckerPanel({
+  connectedAddress,
+  checkAddr,
+  onCheck,
+  onReset,
+  disabled,
+}: {
+  connectedAddress: string | null;
+  checkAddr:        string | null;
+  onCheck:          (addr: string) => void;
+  onReset:          () => void;
+  disabled:         boolean;
+}) {
+  const [showInput, setShowInput] = useState(false);
+  const [input,     setInput]     = useState("");
+  const [err,       setErr]       = useState("");
+
+  const isCustom = checkAddr !== null && checkAddr !== connectedAddress;
+
+  function validate(val: string): string | null {
+    const trimmed = val.trim();
+    if (!trimmed) return "Address required";
+    if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) return "Invalid Ethereum address (must be 0x + 40 hex chars)";
+    return null;
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const error = validate(input);
+    if (error) { setErr(error); return; }
+    setErr("");
+    setShowInput(false);
+    onCheck(input.trim().toLowerCase());
+  }
+
+  return (
+    <div className="border-b border-[#1a1a1a] bg-[#0a0a0a] px-6 py-2.5">
+      {!showInput ? (
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-[#3e3e3e]">Checking</span>
+          <span className="font-mono text-[11px] text-[#a0a0a0]">
+            {checkAddr ? formatHash(checkAddr, 10, 8) : (connectedAddress ? formatHash(connectedAddress, 10, 8) : "—")}
+          </span>
+          {checkAddr === connectedAddress || !checkAddr ? (
+            <span className="rounded-full border border-[#262626] bg-[#141414] px-2 py-0.5 text-[9px] text-[#646464]">Your wallet</span>
+          ) : (
+            <span className="rounded-full border border-amber-500/20 bg-amber-500/8 px-2 py-0.5 text-[9px] text-amber-400">Custom address</span>
+          )}
+          {!disabled && (
+            <>
+              <button
+                onClick={() => { setInput(checkAddr ?? connectedAddress ?? ""); setShowInput(true); setErr(""); }}
+                className="ml-1 rounded border border-[#262626] bg-[#141414] px-2 py-0.5 text-[9px] font-semibold text-[#646464] transition-colors hover:border-[#3e3e3e] hover:text-[#a0a0a0] focus-visible:outline-none"
+              >
+                Change address
+              </button>
+              {isCustom && (
+                <button
+                  onClick={onReset}
+                  className="rounded border border-[#262626] bg-[#141414] px-2 py-0.5 text-[9px] font-semibold text-[#646464] transition-colors hover:border-[#3e3e3e] hover:text-[#a0a0a0] focus-visible:outline-none"
+                >
+                  ← My wallet
+                </button>
+              )}
+            </>
+          )}
+          <span className="ml-auto text-[9px] text-[#3e3e3e]">Enter any address to check against the OFAC sanctions list</span>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-[#3e3e3e]">Address</span>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => { setInput(e.target.value); setErr(""); }}
+            placeholder="0x... any Ethereum address"
+            autoFocus
+            className="min-w-0 flex-1 rounded border border-[#262626] bg-[#141414] px-3 py-1.5 font-mono text-[11px] text-[#a0a0a0] placeholder-[#3e3e3e] outline-none focus:border-[#22c55e]/40 focus:ring-1 focus:ring-[#22c55e]/20"
+          />
+          {err && <span className="shrink-0 text-[10px] text-rose-400">{err}</span>}
+          <button
+            type="submit"
+            className="shrink-0 rounded border border-[#22c55e]/30 bg-[#22c55e]/10 px-3 py-1.5 text-[11px] font-semibold text-[#22c55e] transition-colors hover:bg-[#22c55e]/15 focus-visible:outline-none"
+          >
+            Verify
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowInput(false)}
+            className="shrink-0 rounded border border-[#262626] bg-[#141414] px-3 py-1.5 text-[11px] font-medium text-[#646464] transition-colors hover:text-[#a0a0a0] focus-visible:outline-none"
+          >
+            Cancel
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ProofGenerate page
+// ---------------------------------------------------------------------------
+
 export function ProofGenerate() {
   const navigate     = useNavigate();
   const address      = useWalletStore(selectAddress);
   const currentRoot  = useSanctionsStore(selectCurrentRoot);
+  const { reset: resetStore } = useProofStore();
 
   const steps       = useProofStore(selectProofSteps);
   const status      = useProofStore(selectProofStatus);
@@ -587,14 +783,22 @@ export function ProofGenerate() {
   const proofResult = useProofStore(selectProofResult);
   const elapsedMs   = useProofStore((s) => s.elapsedMs);
 
-  const { prove, reset, isBusy, witnessData } = useProofWorker();
+  // The address being verified — defaults to connected wallet, can be overridden
+  const [checkAddr, setCheckAddr] = useState<string | null>(null);
+  const effectiveAddress = checkAddr ?? address;
+
+  const { witnessData, retry } = useProofWorker(effectiveAddress);
 
   const isGenerating = status === "generating";
   const isDone       = status === "generated" || status === "confirmed";
   const isError      = status === "error";
 
-  const proveStep = steps.find((s) => s.id === "prove");
+  const witnessStep = steps.find((s) => s.id === "witness");
+  const proveStep   = steps.find((s) => s.id === "prove");
+  // Animate the tree path when the prover is actively running
   const imtPhase: StepState | "idle" = proveStep?.state ?? "idle";
+  // Show scanning pulse overlay when step-1 is active and tree not yet available
+  const fetchingWitness = witnessStep?.state === "active" && !witnessData;
 
   // Auto-navigate when done
   useEffect(() => {
@@ -604,19 +808,20 @@ export function ProofGenerate() {
     }
   }, [isDone, navigate]);
 
-  // Auto-start
-  const hasStarted = useRef(false);
-  useEffect(() => {
-    if (address && !hasStarted.current && status === "idle") {
-      hasStarted.current = true;
-      prove(address);
-    }
-  }, [address, status, prove]);
+  // Generation auto-starts inside useProofWorker's effect as soon as an
+  // address is available (StrictMode-safe).
 
-  const handleRetry = useCallback(() => {
-    reset();
-    hasStarted.current = false;
-  }, [reset]);
+  const handleCheck = useCallback((addr: string) => {
+    resetStore();
+    setCheckAddr(addr);
+  }, [resetStore]);
+
+  const handleResetToWallet = useCallback(() => {
+    resetStore();
+    setCheckAddr(null);
+  }, [resetStore]);
+
+  const handleRetry = retry;
 
   // Entrance animation
   const [vis, setVis] = useState(false);
@@ -647,10 +852,10 @@ export function ProofGenerate() {
         </div>
 
         {/* Address chip */}
-        {address && (
+        {effectiveAddress && (
           <div className="flex items-center gap-1.5 rounded-lg border border-[#1e1e1e] bg-[#141414] px-2.5 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" aria-hidden="true" />
-            <span className="font-mono text-[11px] text-[#a0a0a0]">{formatHash(address, 8, 6)}</span>
+            <span className="font-mono text-[11px] text-[#a0a0a0]">{formatHash(effectiveAddress, 8, 6)}</span>
           </div>
         )}
 
@@ -658,16 +863,29 @@ export function ProofGenerate() {
         <ElapsedTimer running={isGenerating} />
 
         {/* Sanctions root pill */}
-        {currentRoot && (
+        {(witnessData?.merkleRoot ?? currentRoot) && (
           <div className="ml-auto hidden items-center gap-2 rounded-lg border border-[#1e1e1e] bg-[#141414] px-3 py-1.5 sm:flex">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#3e3e3e]">sanctions root</span>
-            <span className="font-mono text-[11px] text-[#22c55e]/70">{formatHash(currentRoot, 10, 6)}</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-[#3e3e3e]">
+              {witnessData?.merkleRoot ? "witness root" : "sanctions root"}
+            </span>
+            <span className="font-mono text-[11px] text-[#22c55e]/70">
+              {formatHash((witnessData?.merkleRoot ?? currentRoot)!, 10, 6)}
+            </span>
             <span className="flex items-center gap-1 text-[10px] text-[#3e3e3e]">
               <span className="h-1 w-1 rounded-full bg-[#22c55e]/50" aria-hidden="true" />live
             </span>
           </div>
         )}
       </div>
+
+      {/* ── Address checker bar ─────────────────────────────────────── */}
+      <AddressCheckerPanel
+        connectedAddress={address}
+        checkAddr={effectiveAddress}
+        onCheck={handleCheck}
+        onReset={handleResetToWallet}
+        disabled={isGenerating}
+      />
 
       {/* ── Two-column body ──────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -701,6 +919,7 @@ export function ProofGenerate() {
               witness={witnessData}
               proofState={imtPhase}
               rootHash={currentRoot}
+              fetchingWitness={fetchingWitness}
             />
           </div>
 
@@ -773,6 +992,13 @@ export function ProofGenerate() {
                 </div>
                 <p className="mt-3 text-[10px] text-[#3e3e3e]">Redirecting…</p>
               </div>
+            </div>
+          )}
+
+          {/* Live OFAC sanctions data */}
+          {witnessData && (
+            <div className="border-b border-[#1a1a1a] p-5">
+              <SanctionsDataPanel witness={witnessData} />
             </div>
           )}
 

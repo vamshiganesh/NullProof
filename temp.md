@@ -143,3 +143,102 @@ Radar.tsx (left: grid-canvas sanctions map with animated red dots + green USER_W
 High
 What's NOT changing
 The entire logic layer stays untouched — stores, hooks, prover, wagmi config, contracts, circuit. Only .tsx files and globals.css are touched.
+
+
+
+SANCTIONS_LIST_ADDRESS is the on-chain address of the SanctionsList.sol contract after it's been deployed to Sepolia. You don't "acquire" it from anywhere external — you generate it yourself by running the deployment script.
+
+Here's the full picture:
+
+The value comes from deploying your own contracts. The flow is:
+
+Deploy the Verifier first (generated from your Noir circuit):
+
+nargo compile
+bb write_vk --scheme ultra_honk -b circuit/target/nullproof.json -o circuit/target/vk
+bb contract --scheme ultra_honk -k circuit/target/vk -o contracts/src/Verifier.sol
+forge script script/Deploy.s.sol --sig "deployVerifier()" --broadcast --rpc-url $SEPOLIA_RPC_URL ...
+Deploy SanctionsList + ComplianceGate using the deployment script in contracts/script/Deploy.s.sol:
+
+forge script script/Deploy.s.sol \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --broadcast \
+  --verify \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
+  -vvvv
+This requires these env vars in contracts/.env:
+
+DEPLOYER_PRIVATE_KEY — wallet that pays gas
+ORACLE_ADDRESS — the public address derived from your ORACLE_PRIVATE_KEY in oracle/.env
+VERIFIER_ADDRESS — from step 1 above
+SEPOLIA_RPC_URL
+The deploy script prints the addresses on completion:
+
+SanctionsList:   0xAbCd...
+ComplianceGate:  0x1234...
+Copy those addresses into:
+
+oracle/.env → SANCTIONS_LIST_ADDRESS=0xAbCd...
+frontend/.env.local → VITE_SANCTIONS_LIST_ADDRESS=0xAbCd... and VITE_COMPLIANCE_GATE_ADDRESS=0x1234...
+So right now the value is blank because the contracts haven't been deployed yet. Once you run that Foundry script against Sepolia (using the deployer wallet with some SepoliaETH), you'll get the address.
+
+
+
+
+The problem is that $SEPOLIA_RPC_URL is not set in the shell — the .env file exists but the shell hasn't loaded it. forge script doesn't auto-source .env by default.
+
+But there's also a second problem you'll hit immediately after: VERIFIER_ADDRESS is set to the zero address (0x0000...0000), which the deploy script validates against and will reject.
+
+So fix both before running:
+
+Step 1 — Load the env vars into your shell:
+
+cd /home/ubuntu/projects/nullproof/contracts
+source .env
+Step 2 — You need a real VERIFIER_ADDRESS first
+
+The Verifier.sol contract needs to be deployed separately before you can deploy SanctionsList + ComplianceGate. Check if contracts/src/Verifier.sol exists:
+
+ls contracts/src/Verifier.sol
+If it's there (or you've copied it from circuit/target/Verifier.sol), deploy it with:
+
+source .env
+forge create contracts/src/Verifier.sol:HonkVerifier \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --private-key $DEPLOYER_PRIVATE_KEY \
+  --verify \
+  --etherscan-api-key $ETHERSCAN_API_KEY
+This will print the deployed address. Copy that address into contracts/.env as VERIFIER_ADDRESS=0xYourNewAddress.
+
+Step 3 — Then run the main deployment:
+
+source .env   # reload so VERIFIER_ADDRESS is now set
+forge script script/Deploy.s.sol \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --broadcast \
+  --verify \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
+  -vvvv
+The output will print both SanctionsList and ComplianceGate addresses — those go into oracle/.env and frontend/.env.local.
+
+bash (71-72)
+ 
+
+You're already inside contracts/, so the path contracts/src/Verifier.sol is wrong — it's looking for contracts/contracts/src/. Run it without the contracts/ prefix:
+
+ls src/Verifier.sol
+If that also says not found, copy it from where it was already generated:
+
+cp /home/ubuntu/projects/nullproof/circuit/target/Verifier.sol \
+   /home/ubuntu/projects/nullproof/contracts/src/Verifier.sol
+Then check what the contract is named inside that file so you use the right name in forge create:
+
+grep "^contract " /home/ubuntu/projects/nullproof/contracts/src/Verifier.sol
+That will tell you the exact contract name (e.g. HonkVerifier or UltraHonkVerifier) to use in the forge create command. Then proceed with:
+
+source .env
+forge create src/Verifier.sol:<ContractNameFromAbove> \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --private-key $DEPLOYER_PRIVATE_KEY \
+  --verify \
+  --etherscan-api-key $ETHERSCAN_API_KEY

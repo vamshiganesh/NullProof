@@ -15,6 +15,8 @@
         "preview": "pnpm --filter nullproof-frontend preview",
         "oracle:run": "pnpm --filter nullproof-oracle run",
         "oracle:dev": "pnpm --filter nullproof-oracle dev",
+        "snapshot": "pnpm --filter nullproof-frontend snapshot",
+        "verify-proof": "pnpm --filter nullproof-frontend verify-proof",
         "circuit:compile": "bash scripts/build-circuit.sh",
         "circuit:test": "cd circuit && nargo test",
         "circuit:prove": "cd circuit && nargo prove",

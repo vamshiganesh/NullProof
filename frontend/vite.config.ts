@@ -74,11 +74,27 @@ export default defineConfig(({ mode }) => {
       plugins: () => [wasm()],  // wasm plugin must also apply inside worker bundles
     },
 
+    // ── Asset handling ────────────────────────────────────────────────────────
+    // bb.js ships compressed WASM (.wasm.gz); serve these as raw assets.
+    assetsInclude: ["**/*.wasm.gz", "**/*.gz"],
+
     // ── Optimise deps ─────────────────────────────────────────────────────────
     optimizeDeps: {
       // snarkjs and @zk-kit/imt use WASM + top-level await;
-      // exclude from pre-bundling so Vite doesn't try to CommonJS-wrap them
-      exclude: ["snarkjs", "@zk-kit/imt"],
+      // exclude from pre-bundling so Vite doesn't try to CommonJS-wrap them.
+      //
+      // bb.js + noir packages must ALSO be excluded: they spawn nested workers
+      // via `new Worker(new URL('./thread.worker.js', import.meta.url))`, which
+      // only resolves correctly when the package is served as native ESM
+      // (pre-bundling rewrites import.meta.url and breaks the worker path).
+      exclude: [
+        "snarkjs",
+        "@zk-kit/imt",
+        "@aztec/bb.js",
+        "@noir-lang/noir_js",
+        "@noir-lang/acvm_js",
+        "@noir-lang/noirc_abi",
+      ],
       esbuildOptions: {
         target: "esnext",
       },

@@ -152,3 +152,7 @@ scripts/benchmark-results.json
 # (we use pnpm exclusively)
 yarn.lock
 package-lock.json
+
+frontend/.env.local
+
+temp.md

@@ -231,6 +231,50 @@ export const useProofStore = create<ProofState>()(
 );
 
 // ---------------------------------------------------------------------------
+// Global persistence — write proof to localStorage immediately on generation.
+//
+// This runs at module load time (once, for the lifetime of the app) so the
+// proof is persisted even if the user never visits the Proofs history page.
+// ---------------------------------------------------------------------------
+
+const _HISTORY_KEY = "nullproof:history";
+
+function _persistPendingProof(result: ProofResult, elapsedMs: number | null): void {
+  try {
+    const entry = {
+      id:           result.nullifier,
+      nullifier:    result.nullifier,
+      rootUsed:     result.rootUsed,
+      publicInputs: result.publicInputs,
+      elapsedMs,
+      generatedAt:  result.generatedAt,
+      txHash:       null,
+      confirmedAt:  null,
+      blockNumber:  null,
+      pending:      true,
+    };
+    const raw = localStorage.getItem(_HISTORY_KEY);
+    const existing = raw ? (JSON.parse(raw) as typeof entry[]) : [];
+    const filtered = existing.filter((e) => e.id !== entry.id);
+    localStorage.setItem(_HISTORY_KEY, JSON.stringify([entry, ...filtered]));
+  } catch { /* storage quota exceeded or unavailable */ }
+}
+
+// Subscribe at module level — fires on every state change regardless of mounted
+// components. We track the previous status to detect a genuine transition.
+let _prevProofStatus: ProofStatus = "idle";
+useProofStore.subscribe((state) => {
+  if (
+    state.status === "generated" &&
+    _prevProofStatus !== "generated" &&
+    state.result !== null
+  ) {
+    _persistPendingProof(state.result, state.elapsedMs);
+  }
+  _prevProofStatus = state.status;
+});
+
+// ---------------------------------------------------------------------------
 // Selectors
 // ---------------------------------------------------------------------------
 

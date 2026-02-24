@@ -42,8 +42,8 @@ importers:
   frontend:
     dependencies:
       '@aztec/bb.js':
-        specifier: ^4.3.1
-        version: 4.3.1
+        specifier: 5.0.0-nightly.20260522
+        version: 5.0.0-nightly.20260522
       '@noir-lang/noir_js':
         specifier: ^1.0.0-beta.22
         version: 1.0.0-beta.22
@@ -65,6 +65,9 @@ importers:
       ethers:
         specifier: ^6.13.1
         version: 6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      fast-xml-parser:
+        specifier: ^4.5.6
+        version: 4.5.6
       framer-motion:
         specifier: ^12.40.0
         version: 12.40.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -204,8 +207,8 @@ packages:
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
 
-  '@aztec/bb.js@4.3.1':
-    resolution: {integrity: sha512-qIUgIxcr0Sn8zDCGXm5L+IOhwTxUv0QPzfCeKpNkpy8IbV/0oPbPKTW1U3iqI8zXSiJ0Zkw/ysBdlCyN5cWezw==}
+  '@aztec/bb.js@5.0.0-nightly.20260522':
+    resolution: {integrity: sha512-3QCyPPQrPaFKgXcHw+7Mk+ScGJiMoeOtc6FpQFPTwTVbyFj9FGFdB6bceS6ulyNsmM6JfFmJRcbGerTAjzfbhw==}
     hasBin: true
 
   '@babel/code-frame@7.29.7':
@@ -4666,7 +4669,7 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@aztec/bb.js@4.3.1':
+  '@aztec/bb.js@5.0.0-nightly.20260522':
     dependencies:
       comlink: 4.4.2
       commander: 12.1.0

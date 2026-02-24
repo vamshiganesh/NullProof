@@ -43,15 +43,16 @@ import React, {
   // ---------------------------------------------------------------------------
   
   export interface ProofHistoryEntry {
-    id:          string;          // txHash (dedup key)
+    id:          string;          // nullifier (pending) or txHash (confirmed) — dedup key
     nullifier:   string;
     rootUsed:    string;
     publicInputs: string[];
     elapsedMs:   number | null;
     generatedAt: number;          // Unix ms
-    txHash:      string;
-    confirmedAt: number;          // Unix ms
-    blockNumber: string;          // bigint → string for JSON serialisation
+    txHash:      string | null;   // null when proof is not yet submitted on-chain
+    confirmedAt: number | null;   // null when proof is not yet submitted on-chain
+    blockNumber: string | null;   // null when proof is not yet submitted on-chain
+    pending?:    boolean;         // true = generated this session, not yet on-chain
   }
   
   // ---------------------------------------------------------------------------
@@ -77,12 +78,16 @@ import React, {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
     } catch { /* quota exceeded — silent */ }
   }
-  
-  function appendEntry(entry: ProofHistoryEntry): void {
+
+  /**
+   * Upsert an entry by id (nullifier). If an entry with the same id already
+   * exists it is replaced (e.g. pending → confirmed upgrade). Otherwise the
+   * new entry is prepended. This is safe to call on every state transition.
+   */
+  function upsertEntry(entry: ProofHistoryEntry): void {
     const existing = readHistory();
-    // Skip if already stored (same txHash)
-    if (existing.some((e) => e.id === entry.id)) return;
-    writeHistory([entry, ...existing]);
+    const filtered = existing.filter((e) => e.id !== entry.id);
+    writeHistory([entry, ...filtered]);
   }
   
   // ---------------------------------------------------------------------------
@@ -95,7 +100,9 @@ import React, {
     elapsedMs:  number | null,
   ): ProofHistoryEntry {
     return {
-      id:           submission.txHash,
+      // Use nullifier as the canonical id so that confirming a proof replaces
+      // the previously-stored pending record for the same proof.
+      id:           result.nullifier,
       nullifier:    result.nullifier,
       rootUsed:     result.rootUsed,
       publicInputs: result.publicInputs,
@@ -104,6 +111,25 @@ import React, {
       txHash:       submission.txHash,
       confirmedAt:  submission.confirmedAt,
       blockNumber:  submission.blockNumber.toString(),
+      pending:      false,
+    };
+  }
+
+  function buildPendingEntry(
+    result:    ProofResult,
+    elapsedMs: number | null,
+  ): ProofHistoryEntry {
+    return {
+      id:           result.nullifier,   // use nullifier as dedup key
+      nullifier:    result.nullifier,
+      rootUsed:     result.rootUsed,
+      publicInputs: result.publicInputs,
+      elapsedMs,
+      generatedAt:  result.generatedAt,
+      txHash:       null,
+      confirmedAt:  null,
+      blockNumber:  null,
+      pending:      true,
     };
   }
   
@@ -112,13 +138,15 @@ import React, {
   // ---------------------------------------------------------------------------
   
   function isEntryActive(entry: ProofHistoryEntry): boolean {
-    const elapsed = Date.now() - entry.confirmedAt;
+    const refTime = entry.confirmedAt ?? entry.generatedAt;
+    const elapsed = Date.now() - refTime;
     return elapsed < Number(DEFAULT_VALIDITY_WINDOW_SECONDS) * 1000;
   }
   
   function proofRemainingPct(entry: ProofHistoryEntry): number {
     const windowMs = Number(DEFAULT_VALIDITY_WINDOW_SECONDS) * 1000;
-    const elapsed  = Date.now() - entry.confirmedAt;
+    const refTime  = entry.confirmedAt ?? entry.generatedAt;
+    const elapsed  = Date.now() - refTime;
     return Math.max(0, Math.round((1 - elapsed / windowMs) * 100));
   }
   
@@ -137,32 +165,44 @@ import React, {
   
     const [stored, setStored] = useState<ProofHistoryEntry[]>(() => readHistory());
   
-    // Persist & re-read whenever store confirms a new proof
+    // Persist to localStorage as soon as a proof is generated (pending).
+    // This survives navigation and page refresh without needing on-chain confirmation.
+    useEffect(() => {
+      if (proofStatus === "generated" && proofResult !== null) {
+        upsertEntry(buildPendingEntry(proofResult, elapsedMs));
+        setStored(readHistory());
+      }
+    // elapsedMs is intentionally omitted: we only want to write once per new proof result
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [proofStatus, proofResult]);
+
+    // Upgrade the stored entry to confirmed when the tx lands on-chain.
     useEffect(() => {
       if (
         proofStatus === "confirmed" &&
         proofResult !== null &&
         submission  !== null
       ) {
-        const entry = buildEntry(proofResult, submission, elapsedMs);
-        appendEntry(entry);
+        upsertEntry(buildEntry(proofResult, submission, elapsedMs));
         setStored(readHistory());
       }
     }, [proofStatus, proofResult, submission, elapsedMs]);
   
-    // Merge: live store entry + stored (dedup by txHash)
+    // Merge: live store entry (confirmed or pending) + stored (dedup by id)
     const entries = useMemo<ProofHistoryEntry[]>(() => {
-      const liveEntry =
-        proofStatus === "confirmed" && proofResult && submission
-          ? buildEntry(proofResult, submission, elapsedMs)
-          : null;
+      let liveEntry: ProofHistoryEntry | null = null;
+      if (proofStatus === "confirmed" && proofResult && submission) {
+        liveEntry = buildEntry(proofResult, submission, elapsedMs);
+      } else if (proofStatus === "generated" && proofResult) {
+        liveEntry = buildPendingEntry(proofResult, elapsedMs);
+      }
   
       const all = liveEntry
-        ? [liveEntry, ...stored.filter((e) => e.id !== liveEntry.id)]
+        ? [liveEntry, ...stored.filter((e) => e.id !== liveEntry!.id)]
         : stored;
   
-      // Sort newest confirmedAt first
-      return [...all].sort((a, b) => b.confirmedAt - a.confirmedAt);
+      // Sort newest generatedAt first
+      return [...all].sort((a, b) => b.generatedAt - a.generatedAt);
     }, [proofStatus, proofResult, submission, elapsedMs, stored]);
   
     const clearHistory = useCallback(() => {
@@ -177,7 +217,15 @@ import React, {
   // Status badge
   // ---------------------------------------------------------------------------
   
-  function StatusBadge({ active }: { active: boolean }) {
+  function StatusBadge({ active, pending }: { active: boolean; pending?: boolean }) {
+    if (pending) {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#22c55e]/20 bg-[#22c55e]/8 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#4ade80]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]/60" aria-hidden="true" />
+          Not submitted
+        </span>
+      );
+    }
     return active ? (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/25 bg-teal-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-400">
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-400" aria-hidden="true" />
@@ -274,7 +322,7 @@ import React, {
               Block
             </p>
             <span className="font-mono text-[11px] text-zinc-400">
-              #{entry.blockNumber}
+              {entry.blockNumber ? `#${entry.blockNumber}` : "Not submitted"}
             </span>
           </div>
   
@@ -389,33 +437,44 @@ import React, {
               <span className="font-mono text-xs font-medium text-zinc-300">
                 {formatNullifier(entry.nullifier)}
               </span>
-              <StatusBadge active={active} />
+              <StatusBadge active={active} pending={entry.pending} />
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
               <span className="text-[11px] text-zinc-600">
-                {formatTimestamp(entry.confirmedAt / 1000)}
+                {formatTimestamp(entry.generatedAt / 1000)}
               </span>
               <span className="text-[11px] text-zinc-700">·</span>
               <span className="text-[11px] text-zinc-600">
-                {timeAgo(entry.confirmedAt / 1000)}
+                {timeAgo(entry.generatedAt / 1000)}
               </span>
             </div>
           </div>
   
           {/* Right side */}
           <div className="flex shrink-0 items-center gap-3">
-            {/* Tx link */}
-            <a
-              href={txUrl(entry.txHash)}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="hidden items-center gap-1 font-mono text-[11px] text-zinc-600 transition-colors hover:text-zinc-400 sm:flex"
-              aria-label="View transaction on explorer"
-            >
-              {formatHash(entry.txHash, 6, 4)}
-              <ExternalLinkIcon className="h-2.5 w-2.5" />
-            </a>
+            {/* Tx link — only for confirmed proofs */}
+            {entry.txHash && (
+              <a
+                href={txUrl(entry.txHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="hidden items-center gap-1 font-mono text-[11px] text-zinc-600 transition-colors hover:text-zinc-400 sm:flex"
+                aria-label="View transaction on explorer"
+              >
+                {formatHash(entry.txHash, 6, 4)}
+                <ExternalLinkIcon className="h-2.5 w-2.5" />
+              </a>
+            )}
+            {entry.pending && (
+              <Link
+                to="/app/proof/ready"
+                onClick={(e) => e.stopPropagation()}
+                className="hidden items-center gap-1 font-mono text-[11px] text-[#22c55e]/60 transition-colors hover:text-[#22c55e] sm:flex"
+              >
+                Submit →
+              </Link>
+            )}
   
             {/* Chevron */}
             <ChevronIcon
@@ -457,11 +516,11 @@ import React, {
         </div>
         <h2 className="text-sm font-semibold text-zinc-400">No proofs yet</h2>
         <p className="mt-2 max-w-xs text-xs leading-relaxed text-zinc-600">
-          Generate your first zero-knowledge compliance proof from the Ledger page.
-          Confirmed proofs will appear here.
+          Generate your first zero-knowledge compliance proof. Proofs appear here
+          immediately after generation, even before on-chain submission.
         </p>
         <Link
-          to="/app/ledger"
+          to="/app/proof/generate"
           className={[
             "mt-6 inline-flex items-center gap-2 rounded-xl",
             "bg-teal-600 px-4 py-2 text-xs font-semibold text-white",
@@ -469,7 +528,7 @@ import React, {
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
           ].join(" ")}
         >
-          Open ledger
+          Generate proof
           <ArrowRightIcon className="h-3 w-3" />
         </Link>
       </div>
@@ -610,7 +669,7 @@ import React, {
   
               {/* Generate CTA */}
               <Link
-                to="/app/ledger"
+                to="/app/proof/generate"
                 className={[
                   "inline-flex items-center gap-1.5 rounded-xl",
                   "bg-teal-600 px-3.5 py-1.5 text-[11px] font-semibold text-white",
@@ -667,7 +726,7 @@ import React, {
               />
               <SummaryTile
                 label="Last proof"
-                value={timeAgo(entries[0]!.confirmedAt / 1000)}
+                value={timeAgo((entries[0]!.confirmedAt ?? entries[0]!.generatedAt) / 1000)}
                 icon={<CalendarIcon className="h-3.5 w-3.5" />}
               />
             </div>

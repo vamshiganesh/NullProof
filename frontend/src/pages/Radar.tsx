@@ -20,8 +20,19 @@ import React, {
 } from "react";
 import { useAccount } from "wagmi";
 import { formatHash } from "@/lib/format";
-import { findLowLeafForAddress, loadSnapshot } from "@/lib/prover/ofac/snapshot";
-import type { HexString } from "@/lib/prover/imt/types";
+
+// ---------------------------------------------------------------------------
+// Snapshot type — matches the actual /data/sanctions-imt.json format
+// ---------------------------------------------------------------------------
+interface SanctionsSnapshot {
+  source:       string;
+  fetchedAt:    string;
+  builtAt:      string;
+  depth:        number;
+  addressCount: number;
+  root:         string;
+  entries:      { address: string; value: string }[];
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -286,24 +297,46 @@ export function Radar() {
     setError(null);
     void (async () => {
       try {
-        const [snapshot, qr] = await Promise.all([
-          loadSnapshot(),
-          findLowLeafForAddress(address),
-        ]);
-        const leaves = snapshot.leaves as HexString[];
-        const subset = leaves.length > MAX_RADAR_DOTS
-          ? leaves.filter((_, i) => i % Math.ceil(leaves.length / MAX_RADAR_DOTS) === 0)
-          : leaves;
-        const mapped: RadarDot[] = subset.map((leaf) => {
-          const { angle, radius } = hashToPosition(leaf);
-          return { angle, radius, leafHash: leaf, lastHit: 0, isFlagged: qr.exists && leaf === qr.queriedLeaf };
+        const res = await fetch("/data/sanctions-imt.json", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to load OFAC snapshot (HTTP ${res.status})`);
+        const snapshot = (await res.json()) as SanctionsSnapshot;
+
+        if (!Array.isArray(snapshot.entries)) {
+          throw new Error("Snapshot has no entries array");
+        }
+
+        const lowerAddr = address.toLowerCase();
+        const isSanctioned = snapshot.entries.some(
+          (e) => e.address.toLowerCase() === lowerAddr,
+        );
+
+        // Sample down to MAX_RADAR_DOTS for performance
+        const entries = snapshot.entries;
+        const step    = entries.length > MAX_RADAR_DOTS
+          ? Math.ceil(entries.length / MAX_RADAR_DOTS)
+          : 1;
+        const subset  = entries.filter((_, i) => i % step === 0);
+
+        const mapped: RadarDot[] = subset.map((entry) => {
+          const { angle, radius } = hashToPosition(entry.address);
+          return {
+            angle,
+            radius,
+            leafHash:  entry.address,
+            lastHit:   0,
+            isFlagged: entry.address.toLowerCase() === lowerAddr,
+          };
         });
+
         dotsRef.current = mapped;
         setDots(mapped);
-        setFlagged(qr.exists);
+        setFlagged(isSanctioned);
         setStats({
-          total: snapshot.addressCount, scanned: 0, flagged: qr.exists ? 1 : 0,
-          snapshotDate: snapshot.builtAt, root: snapshot.root as string,
+          total:        snapshot.addressCount,
+          scanned:      0,
+          flagged:      isSanctioned ? 1 : 0,
+          snapshotDate: snapshot.builtAt,
+          root:         snapshot.root,
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load OFAC snapshot");

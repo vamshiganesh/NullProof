@@ -15,6 +15,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import type { Hex } from "viem";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -421,7 +422,27 @@ export function ProofReady() {
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
       setConfirmed({ txHash, confirmedAt: Date.now(), blockNumber: receipt.blockNumber });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Submission failed");
+      const msg = err instanceof Error ? err.message : "Submission failed";
+
+      if (msg.includes("NullifierAlreadyUsed") && result) {
+        // Nullifier already consumed on-chain from a prior session.
+        try {
+          const { readNullifierUsedAt } = await import("@/lib/chain/contracts");
+          const usedAtSecs = await readNullifierUsedAt(result.nullifier);
+          const history    = localStorage.getItem("nullproof:history");
+          const txFromHistory: Hex | null = history
+            ? ((JSON.parse(history) as Array<{ id: string; txHash: string | null }>)
+                .find((e) => e.id === result.nullifier && e.txHash)?.txHash ?? null) as Hex | null
+            : null;
+          const txHash = txFromHistory ?? (("0x" + "00".repeat(32)) as Hex);
+          setConfirmed({ txHash, confirmedAt: Number(usedAtSecs) * 1000, blockNumber: 0n });
+        } catch {
+          setError("Proof already submitted on-chain — check ZK Proofs history.");
+        }
+        return;
+      }
+
+      setError(msg);
     }
   }, [result, address, startSubmission, setConfirmed, setError]);
 

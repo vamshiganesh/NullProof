@@ -231,15 +231,73 @@ export const useProofStore = create<ProofState>()(
 );
 
 // ---------------------------------------------------------------------------
-// Global persistence — write proof to localStorage immediately on generation.
+// Global persistence — write proof to localStorage immediately on generation
+// or confirmation, and hydrate the store back from storage on app startup.
 //
-// This runs at module load time (once, for the lifetime of the app) so the
-// proof is persisted even if the user never visits the Proofs history page.
+// Two localStorage keys:
+//   "nullproof:history"      — display metadata list (Proofs tab)
+//   "nullproof:latest-proof" — full ProofResult + SubmissionResult for store
+//                              hydration (Dashboard, Ledger, etc.)
 // ---------------------------------------------------------------------------
 
-const _HISTORY_KEY = "nullproof:history";
+const _HISTORY_KEY     = "nullproof:history";
+const _LATEST_KEY      = "nullproof:latest-proof";
+const _VALIDITY_MS     = 24 * 60 * 60 * 1_000; // 24 hours
 
-function _persistPendingProof(result: ProofResult, elapsedMs: number | null): void {
+// bigint-safe serialisation for SubmissionResult
+interface _SerializedSubmission {
+  txHash:      string;
+  confirmedAt: number;
+  blockNumber: string;  // bigint serialised as decimal string
+}
+
+interface _PersistedProof {
+  result:     ProofResult;
+  submission: _SerializedSubmission | null;
+  status:     "generated" | "confirmed";
+  elapsedMs:  number | null;
+}
+
+function _saveLatestProof(result: ProofResult, submission: SubmissionResult | null, status: "generated" | "confirmed", elapsedMs: number | null): void {
+  try {
+    const data: _PersistedProof = {
+      result,
+      submission: submission
+        ? { txHash: submission.txHash, confirmedAt: submission.confirmedAt, blockNumber: submission.blockNumber.toString() }
+        : null,
+      status,
+      elapsedMs,
+    };
+    localStorage.setItem(_LATEST_KEY, JSON.stringify(data));
+  } catch { /* quota exceeded */ }
+}
+
+function _loadLatestProof(): { result: ProofResult; submission: SubmissionResult | null; status: "generated" | "confirmed"; elapsedMs: number | null } | null {
+  try {
+    const raw = localStorage.getItem(_LATEST_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as _PersistedProof;
+    if (!parsed?.result?.proof || !parsed?.result?.nullifier) return null;
+    // Discard if the proof is older than the validity window
+    const refTime = parsed.submission?.confirmedAt ?? parsed.result.generatedAt;
+    if (Date.now() - refTime > _VALIDITY_MS) {
+      localStorage.removeItem(_LATEST_KEY);
+      return null;
+    }
+    const submission: SubmissionResult | null = parsed.submission
+      ? { txHash: parsed.submission.txHash as `0x${string}`, confirmedAt: parsed.submission.confirmedAt, blockNumber: BigInt(parsed.submission.blockNumber) }
+      : null;
+    return { result: parsed.result, submission, status: parsed.status, elapsedMs: parsed.elapsedMs };
+  } catch {
+    return null;
+  }
+}
+
+function _persistHistoryEntry(
+  result:     ProofResult,
+  submission: SubmissionResult | null,
+  elapsedMs:  number | null,
+): void {
   try {
     const entry = {
       id:           result.nullifier,
@@ -248,29 +306,62 @@ function _persistPendingProof(result: ProofResult, elapsedMs: number | null): vo
       publicInputs: result.publicInputs,
       elapsedMs,
       generatedAt:  result.generatedAt,
-      txHash:       null,
-      confirmedAt:  null,
-      blockNumber:  null,
-      pending:      true,
+      txHash:       submission?.txHash ?? null,
+      confirmedAt:  submission?.confirmedAt ?? null,
+      blockNumber:  submission ? submission.blockNumber.toString() : null,
+      pending:      submission === null,
     };
-    const raw = localStorage.getItem(_HISTORY_KEY);
+    const raw      = localStorage.getItem(_HISTORY_KEY);
     const existing = raw ? (JSON.parse(raw) as typeof entry[]) : [];
     const filtered = existing.filter((e) => e.id !== entry.id);
     localStorage.setItem(_HISTORY_KEY, JSON.stringify([entry, ...filtered]));
-  } catch { /* storage quota exceeded or unavailable */ }
+  } catch { /* quota exceeded */ }
 }
 
-// Subscribe at module level — fires on every state change regardless of mounted
-// components. We track the previous status to detect a genuine transition.
-let _prevProofStatus: ProofStatus = "idle";
+// ---------------------------------------------------------------------------
+// Hydrate store from localStorage on module load (runs once, synchronously).
+// This restores Dashboard and Ledger state across page refreshes.
+// ---------------------------------------------------------------------------
+let _hydrating = false;
+(function _hydrateFromStorage() {
+  const saved = _loadLatestProof();
+  if (!saved) return;
+  _hydrating = true;
+  useProofStore.setState({
+    status:     saved.status,
+    result:     saved.result,
+    submission: saved.submission,
+    elapsedMs:  saved.elapsedMs,
+    // Steps are not meaningful after hydration — mark all done
+    steps: [
+      { id: "witness",  label: "Computing witness",       state: "done" },
+      { id: "prove",    label: "Generating ZK proof",     state: "done" },
+      { id: "validate", label: "Validating public inputs", state: "done" },
+      { id: "ready",    label: "Proof ready",              state: "done" },
+    ],
+    error: null,
+  });
+  _hydrating = false;
+})();
+
+// Subscribe at module level — fires on every state change regardless of which
+// component is mounted. Persists on "generated" and "confirmed" transitions.
+// Skips re-persistence during the initial hydration setState call.
+let _prevProofStatus: ProofStatus = useProofStore.getState().status;
 useProofStore.subscribe((state) => {
-  if (
-    state.status === "generated" &&
-    _prevProofStatus !== "generated" &&
-    state.result !== null
-  ) {
-    _persistPendingProof(state.result, state.elapsedMs);
+  if (_hydrating) return;
+  const changed = state.status !== _prevProofStatus;
+
+  if (changed && state.status === "generated" && state.result !== null) {
+    _persistHistoryEntry(state.result, null, state.elapsedMs);
+    _saveLatestProof(state.result, null, "generated", state.elapsedMs);
   }
+
+  if (changed && state.status === "confirmed" && state.result !== null && state.submission !== null) {
+    _persistHistoryEntry(state.result, state.submission, state.elapsedMs);
+    _saveLatestProof(state.result, state.submission, "confirmed", state.elapsedMs);
+  }
+
   _prevProofStatus = state.status;
 });
 

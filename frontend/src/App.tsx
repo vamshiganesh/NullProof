@@ -48,6 +48,12 @@ import { TopNav }       from "@/components/layout/TopNav";
 import { useWalletStore }   from "@/store/walletStore";
 import { useWallet }         from "@/hooks/useWallet";
 import type { WalletBadgeProps } from "@/components/layout/TopNav";
+import {
+  useProofStore,
+  selectProofStatus,
+  selectProofResult,
+} from "@/store/proofStore";
+import type { Hex } from "viem";
 
 
 // ---------------------------------------------------------------------------
@@ -66,6 +72,7 @@ const Protocol        = React.lazy(() => import("@/pages/Protocol"));
 const ProtocolCircuit = React.lazy(() => import("@/pages/ProtocolCircuit"));
 const Ledger          = React.lazy(() => import("@/pages/Ledger"));
 const Radar           = React.lazy(() => import("@/pages/Radar"));
+const Screening       = React.lazy(() => import("@/pages/Screening"));
 const Audits          = React.lazy(() => import("@/pages/Audits"));
 const Integrations    = React.lazy(() => import("@/pages/Integrations"));
 const NotFound        = React.lazy(() => import("@/pages/NotFound"));
@@ -132,6 +139,64 @@ function ScrollToTop() {
 }
 
 // ---------------------------------------------------------------------------
+// NullifierReconciler — renderless, always mounted inside AppShell.
+//
+// After a page refresh the store is hydrated from localStorage with
+// status="generated". If the nullifier was already submitted on-chain in a
+// previous session, the contract will reject a re-submission with
+// NullifierAlreadyUsed. This component proactively detects that case and
+// silently transitions the store to "confirmed" so Dashboard and Ledger
+// display the correct ACTIVE / verified state.
+// ---------------------------------------------------------------------------
+
+function _readHistoryTxHash(nullifier: string): Hex | null {
+  try {
+    const raw = localStorage.getItem("nullproof:history");
+    if (!raw) return null;
+    const entries = JSON.parse(raw) as Array<{ id: string; txHash: string | null }>;
+    const match = entries.find((e) => e.id === nullifier && e.txHash);
+    return (match?.txHash ?? null) as Hex | null;
+  } catch {
+    return null;
+  }
+}
+
+function NullifierReconciler() {
+  const proofStatus  = useProofStore(selectProofStatus);
+  const proofResult  = useProofStore(selectProofResult);
+  const setConfirmed = useProofStore((s) => s.setConfirmed);
+
+  const nullifier = proofResult?.nullifier ?? null;
+
+  useEffect(() => {
+    if (proofStatus !== "generated" || !nullifier) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { readIsNullifierUsed, readNullifierUsedAt } =
+          await import("@/lib/chain/contracts");
+        const used = await readIsNullifierUsed(nullifier as Hex);
+        if (!used || cancelled) return;
+        const usedAtSecs = await readNullifierUsedAt(nullifier as Hex);
+        if (cancelled) return;
+        const txHash =
+          _readHistoryTxHash(nullifier) ?? (("0x" + "00".repeat(32)) as Hex);
+        setConfirmed({
+          txHash,
+          confirmedAt: Number(usedAtSecs) * 1000,
+          blockNumber: 0n,
+        });
+      } catch {
+        // Network error — ignore; the user can still attempt submission
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [nullifier, proofStatus, setConfirmed]);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // AppShell — wraps all /app/* routes
 //
 // Layout:
@@ -175,6 +240,7 @@ function AppShell() {
       >
         <WalletSync />
         <ScrollToTop />
+        <NullifierReconciler />
         <Suspense fallback={<PageLoader />}>
           <Outlet />
         </Suspense>
@@ -243,6 +309,9 @@ function AppRoutes() {
 
         {/* Live sanctions / watchlist feed */}
         <Route path="radar" element={<Radar />} />
+
+        {/* Off-chain address screening tool */}
+        <Route path="screening" element={<Screening />} />
 
         {/* Audits */}
         <Route path="audits" element={<Audits />} />

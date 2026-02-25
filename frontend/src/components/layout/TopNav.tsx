@@ -40,6 +40,7 @@ const NAV_LINKS = [
   { label: "ZK Proofs",    to: "/app/proof"        },
   { label: "Ledger",       to: "/app/ledger"       },
   { label: "Radar",        to: "/app/radar"        },
+  { label: "Screening",    to: "/app/screening"    },
   { label: "Protocol",     to: "/app/protocol"     },
   { label: "Audits",       to: "/app/audits"       },
   { label: "Integrations", to: "/app/integrations" },

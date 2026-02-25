@@ -24,6 +24,11 @@ import "@/styles/fonts.css";
 import "@/styles/globals.css";
 import "@/styles/animations.css";
 
+// ── Store boot — import eagerly so the hydration IIFE in proofStore.ts ────
+// runs before any lazy-loaded page component reads the store. This ensures
+// Dashboard and Ledger see the restored proof on first render.
+import "@/store/proofStore";
+
 // ── App ───────────────────────────────────────────────────────────────────
 import { App } from "@/App";
 

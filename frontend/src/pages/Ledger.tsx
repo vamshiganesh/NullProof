@@ -417,6 +417,27 @@ export function Ledger() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed";
       setLocalSubmitting(false);
+
+      if (msg.includes("NullifierAlreadyUsed")) {
+        // Nullifier already consumed on-chain from a prior session.
+        // Resolve the store as confirmed so the UI shows the correct state.
+        try {
+          const { readNullifierUsedAt } = await import("@/lib/chain/contracts");
+          const usedAtSecs = await readNullifierUsedAt(proofResult.nullifier);
+          const history    = localStorage.getItem("nullproof:history");
+          const txFromHistory: Hex | null = history
+            ? ((JSON.parse(history) as Array<{ id: string; txHash: string | null }>)
+                .find((e) => e.id === proofResult.nullifier && e.txHash)?.txHash ?? null) as Hex | null
+            : null;
+          const txHash = txFromHistory ?? (("0x" + "00".repeat(32)) as Hex);
+          setLocalConfirmed(true);
+          setConfirmed({ txHash, confirmedAt: Number(usedAtSecs) * 1000, blockNumber: 0n });
+        } catch {
+          setLocalError("Proof already submitted on-chain — check ZK Proofs history.");
+        }
+        return;
+      }
+
       setLocalError(msg);
       setError(msg);
     }

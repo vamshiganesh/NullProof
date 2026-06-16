@@ -8,7 +8,7 @@ import {
   PROOF_GENERATION_TIMEOUT_MS,
   ORACLE_BASE_URL,
 } from "@/lib/constants";
-import { writeAssertCompliant } from "@/lib/chain/contracts";
+import { submitAssertCompliant } from "@/lib/chain/submitProof";
 import type { ProofResult, SubmissionResult } from "@/store/proofStore";
 
 // ---------------------------------------------------------------------------
@@ -56,17 +56,6 @@ function proofToHex(proof: Uint8Array): Hex {
 
 function toHex(value: string): Hex {
   return (value.startsWith("0x") ? value : `0x${value}`) as Hex;
-}
-
-async function deriveNullifier(proof: Uint8Array, address: string): Promise<Hex> {
-  const encoder  = new TextEncoder();
-  const combined = new Uint8Array([...proof, ...encoder.encode(address.toLowerCase())]);
-  const hashBuf  = await crypto.subtle.digest("SHA-256", combined);
-  return toHex(
-    Array.from(new Uint8Array(hashBuf))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join(""),
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +162,7 @@ export function useProver(): UseProverReturn {
     const proofHex     = proofToHex(rawProof.proof);
     const publicInputs = rawProof.publicInputs.map(toHex);
     const rootUsed     = publicInputs[0] as Hex;
-    const nullifier    = await deriveNullifier(rawProof.proof, targetAddress);
+    const nullifier    = (publicInputs[1] ?? publicInputs[0]) as Hex;
 
     if (currentRoot && rootUsed.toLowerCase() !== currentRoot.toLowerCase()) {
       setStepError("validate");
@@ -241,23 +230,17 @@ export function useProver(): UseProverReturn {
       startSubmission();
 
       try {
-        const txHash = await writeAssertCompliant({
+        const { txHash, blockNumber } = await submitAssertCompliant({
           proof:        result.proof,
           publicInputs: result.publicInputs,
           nullifier:    result.nullifier,
           account:      address,
         });
 
-        const { createPublicClient, http } = await import("viem");
-        const { sepolia } = await import("viem/chains");
-
-        const publicClient = createPublicClient({ chain: sepolia, transport: http() });
-        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-
         const submissionResult: SubmissionResult = {
           txHash,
           confirmedAt: Date.now(),
-          blockNumber: receipt.blockNumber,
+          blockNumber,
         };
 
         setConfirmed(submissionResult);

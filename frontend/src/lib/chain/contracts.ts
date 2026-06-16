@@ -4,6 +4,7 @@ import {
   createWalletClient,
   custom,
   http,
+  parseAbiItem,
   type Account,
   type Address,
   type Hash,
@@ -22,20 +23,8 @@ import {
   SANCTIONS_LIST_ADDRESS,
   VERIFIER_ADDRESS,
   SUPPORTED_CHAIN_ID,
+  COMPLIANT_VAULT_ADDRESS,
 } from "@/lib/constants";
-// ---------------------------------------------------------------------------
-// EIP-1193 window.ethereum type augmentation
-// ---------------------------------------------------------------------------
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-      on: (event: string, handler: (...args: unknown[]) => void) => void;
-      removeListener: (event: string, handler: (...args: unknown[]) => void) => void;
-      isMetaMask?: boolean;
-    };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // ABI re-exports
@@ -179,6 +168,122 @@ export async function readNullifierUsedAt(nullifier: Hex, client?: PublicClient)
   }) as Promise<bigint>;
 }
 
+export interface NullifierSubmission {
+  txHash:      Hex;
+  blockNumber: bigint;
+  confirmedAt: number; // Unix ms
+}
+
+/**
+ * Look up the transaction that consumed a nullifier by scanning ComplianceGate
+ * events in a narrow window around the on-chain consumption timestamp.
+ * Public RPCs reject wide eth_getLogs ranges; indexed topics + ~200-block
+ * chunks keeps requests within limits.
+ */
+export async function fetchNullifierSubmission(
+  nullifier: Hex,
+  client?: PublicClient,
+): Promise<NullifierSubmission | null> {
+  const c    = client ?? createDefaultPublicClient();
+  const gate = getComplianceGateAddress();
+
+  const eventProof = parseAbiItem(
+    "event ProofVerified(bytes32 indexed nullifier, bytes32 indexed root, uint256 validUntil)",
+  );
+  const eventConsumed = parseAbiItem(
+    "event NullifierConsumed(bytes32 indexed nullifier, address indexed caller)",
+  );
+
+  const usedAtSecs = await readNullifierUsedAt(nullifier, c);
+  if (usedAtSecs === 0n) return null;
+
+  async function findInRange(fromBlock: bigint, toBlock: bigint) {
+    const CHUNK = 200n;
+    for (let start = fromBlock; start <= toBlock; start += CHUNK) {
+      const end = start + CHUNK - 1n > toBlock ? toBlock : start + CHUNK - 1n;
+      try {
+        const proofLogs = await c.getLogs({
+          address: gate, event: eventProof, args: { nullifier },
+          fromBlock: start, toBlock: end,
+        });
+        if (proofLogs.length > 0) {
+          const log = proofLogs[proofLogs.length - 1]!;
+          return { txHash: log.transactionHash, blockNumber: log.blockNumber };
+        }
+        const consumedLogs = await c.getLogs({
+          address: gate, event: eventConsumed, args: { nullifier },
+          fromBlock: start, toBlock: end,
+        });
+        if (consumedLogs.length > 0) {
+          const log = consumedLogs[consumedLogs.length - 1]!;
+          return { txHash: log.transactionHash, blockNumber: log.blockNumber };
+        }
+      } catch {
+        // Retry this window in smaller slices (some RPCs cap at 100 blocks).
+        for (let s = start; s <= end; s += 50n) {
+          const e = s + 49n > end ? end : s + 49n;
+          try {
+            const proofLogs = await c.getLogs({
+              address: gate, event: eventProof, args: { nullifier },
+              fromBlock: s, toBlock: e,
+            });
+            if (proofLogs.length > 0) {
+              const log = proofLogs[proofLogs.length - 1]!;
+              return { txHash: log.transactionHash, blockNumber: log.blockNumber };
+            }
+            const consumedLogs = await c.getLogs({
+              address: gate, event: eventConsumed, args: { nullifier },
+              fromBlock: s, toBlock: e,
+            });
+            if (consumedLogs.length > 0) {
+              const log = consumedLogs[consumedLogs.length - 1]!;
+              return { txHash: log.transactionHash, blockNumber: log.blockNumber };
+            }
+          } catch { /* skip slice */ }
+        }
+      }
+    }
+    return null;
+  }
+
+  // Centre the search on the block where the nullifier was consumed (~12s/block on Sepolia).
+  const latest      = await c.getBlockNumber();
+  const latestBlock = await c.getBlock({ blockNumber: latest });
+  const timeDiff    = Math.max(0, Number(latestBlock.timestamp) - Number(usedAtSecs));
+  const blockDiff   = BigInt(Math.floor(timeDiff / 12));
+  const center      = latest > blockDiff ? latest - blockDiff : 0n;
+  const WINDOW      = 4_000n;
+
+  let from = center > WINDOW ? center - WINDOW : 0n;
+  let to   = center + WINDOW > latest ? latest : center + WINDOW;
+
+  // Fast path: tight window around the estimated block (usually sufficient).
+  const TIGHT = 600n;
+  let found = await findInRange(
+    center > TIGHT ? center - TIGHT : 0n,
+    center + TIGHT > latest ? latest : center + TIGHT,
+  );
+  if (!found) found = await findInRange(from, to);
+
+  // Expand outward if the estimate was off (e.g. clock skew).
+  if (!found && from > 0n) {
+    const expandFrom = from > 20_000n ? from - 20_000n : 0n;
+    found = await findInRange(expandFrom, from - 1n);
+  }
+  if (!found && to < latest) {
+    const expandTo = to + 20_000n > latest ? latest : to + 20_000n;
+    found = await findInRange(to + 1n, expandTo);
+  }
+
+  if (!found) return null;
+
+  return {
+    txHash:      found.txHash as Hex,
+    blockNumber: found.blockNumber,
+    confirmedAt: Number(usedAtSecs) * 1000,
+  };
+}
+
 export async function readValidityWindow(client?: PublicClient): Promise<bigint> {
   const c = client ?? createDefaultPublicClient();
   return c.readContract({
@@ -232,6 +337,54 @@ export async function writeAssertCompliant(params: AssertCompliantParams): Promi
     abi: complianceGateAbi,
     functionName: "assertCompliant",
     args: [params.proof, params.publicInputs, params.nullifier],
+    account: params.account,
+  });
+  return walletClient.writeContract(request);
+}
+
+// ---------------------------------------------------------------------------
+// CompliantVault write
+// ---------------------------------------------------------------------------
+
+const compliantVaultAbi = [
+  {
+    type: "function",
+    name: "deposit",
+    inputs: [
+      { name: "proof", type: "bytes", internalType: "bytes" },
+      { name: "publicInputs", type: "bytes32[]", internalType: "bytes32[]" },
+      { name: "nullifier", type: "bytes32", internalType: "bytes32" },
+    ],
+    outputs: [],
+    stateMutability: "payable",
+  },
+] as const;
+
+function getCompliantVaultAddress(): Address {
+  const value = COMPLIANT_VAULT_ADDRESS;
+  return assertAddress(value, "VITE_COMPLIANT_VAULT_ADDRESS");
+}
+
+export interface VaultDepositParams {
+  proof:        Hex;
+  publicInputs: Hex[];
+  nullifier:    Hex;
+  value:        bigint;
+  account:      Account | Address;
+  walletClient?: WalletClient;
+}
+
+export async function writeVaultDeposit(params: VaultDepositParams): Promise<Hash> {
+  const walletClient =
+    params.walletClient ?? createInjectedWalletClient(params.account);
+  const publicClient = createDefaultPublicClient();
+  const vault = getCompliantVaultAddress();
+  const { request } = await publicClient.simulateContract({
+    address: vault,
+    abi:     compliantVaultAbi,
+    functionName: "deposit",
+    args: [params.proof, params.publicInputs, params.nullifier],
+    value:   params.value,
     account: params.account,
   });
   return walletClient.writeContract(request);

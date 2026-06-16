@@ -95,6 +95,11 @@ contract ComplianceGate is IComplianceGate, Ownable, ReentrancyGuard {
         if (_usedNullifiers[nullifier]) revert NullifierAlreadyUsed(nullifier);
 
         bytes32 proofRoot = _extractRoot(publicInputs);
+        bytes32 proofNullifier = _extractNullifier(publicInputs);
+
+        if (nullifier != proofNullifier) {
+            revert NullifierMismatch(proofNullifier, nullifier);
+        }
 
         if (!_sanctionsList.isKnownRoot(proofRoot)) revert UnknownRoot();
         if (_isRootExpired(proofRoot)) revert ProofExpired();
@@ -204,6 +209,12 @@ contract ComplianceGate is IComplianceGate, Ownable, ReentrancyGuard {
     function _extractRoot(bytes32[] calldata publicInputs) internal pure returns (bytes32) {
         require(publicInputs.length >= 1, "ComplianceGate: missing public inputs");
         return publicInputs[0];
+    }
+
+    /// @dev Extract the nullifier from the public inputs array (index 1).
+    function _extractNullifier(bytes32[] calldata publicInputs) internal pure returns (bytes32) {
+        require(publicInputs.length >= 2, "ComplianceGate: missing nullifier public input");
+        return publicInputs[1];
     }
 
     /// @dev Returns true if the given root is older than the validity window.

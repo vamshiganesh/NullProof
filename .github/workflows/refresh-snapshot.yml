@@ -1,13 +1,12 @@
-name: Refresh OFAC Snapshot
+name: Refresh OFAC Snapshot (offline only)
 
-# Fetches the live OFAC SDN list every 24h, rebuilds the circuit-exact Indexed
-# Merkle Tree snapshot, and commits it so the in-browser prover always checks
-# against current sanctions data.
+# DEPRECATED for production: use update-sanctions.yml instead, which builds the
+# same sanctions-imt.json AND publishes the root on Sepolia.
+#
+# This workflow only rebuilds the JSON file without an on-chain publish.
+# Kept for manual offline refresh / debugging.
 
 on:
-  schedule:
-    # 00:15 UTC daily — shortly after OFAC's typical publish window.
-    - cron: "15 0 * * *"
   workflow_dispatch: {}
 
 permissions:

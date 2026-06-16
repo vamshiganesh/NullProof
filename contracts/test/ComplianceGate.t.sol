@@ -75,9 +75,10 @@ contract ComplianceGateTest is Test {
         vm.prank(oracle);
         sanctionsList.updateRoot(ROOT_A, 3_412);
 
-        // Build publicInputs with ROOT_A at index 0
-        publicInputs = new bytes32[](1);
+        // Build publicInputs with ROOT_A at index 0 and NULLIFIER at index 1
+        publicInputs = new bytes32[](2);
         publicInputs[0] = ROOT_A;
+        publicInputs[1] = NULLIFIER;
     }
 
     // -------------------------------------------------------------------------
@@ -123,6 +124,15 @@ contract ComplianceGateTest is Test {
     function test_assertCompliant_succeedsWithValidProof() public {
         vm.prank(user);
         gate.assertCompliant(validProof, publicInputs, NULLIFIER);
+    }
+
+    function test_assertCompliant_revertsOnNullifierMismatch() public {
+        bytes32 wrong = keccak256("wrong_nullifier");
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(IComplianceGate.NullifierMismatch.selector, NULLIFIER, wrong)
+        );
+        gate.assertCompliant(validProof, publicInputs, wrong);
     }
 
     function test_assertCompliant_consumesNullifier() public {
@@ -176,8 +186,9 @@ contract ComplianceGateTest is Test {
     }
 
     function test_assertCompliant_revertsOnUnknownRoot() public {
-        bytes32[] memory badInputs = new bytes32[](1);
+        bytes32[] memory badInputs = new bytes32[](2);
         badInputs[0] = keccak256("unknown_root");
+        badInputs[1] = NULLIFIER;
 
         vm.prank(user);
         vm.expectRevert(IComplianceGate.UnknownRoot.selector);
@@ -375,20 +386,26 @@ contract ComplianceGateTest is Test {
 
     function testFuzz_assertCompliant_uniqueNullifiersAlwaysPass(bytes32 nullifier) public {
         vm.assume(nullifier != bytes32(0));
+        bytes32[] memory inputs = new bytes32[](2);
+        inputs[0] = ROOT_A;
+        inputs[1] = nullifier;
         vm.prank(user);
-        gate.assertCompliant(validProof, publicInputs, nullifier);
+        gate.assertCompliant(validProof, inputs, nullifier);
         assertTrue(gate.isNullifierUsed(nullifier));
     }
 
     function testFuzz_assertCompliant_replayAlwaysReverts(bytes32 nullifier) public {
         vm.assume(nullifier != bytes32(0));
+        bytes32[] memory inputs = new bytes32[](2);
+        inputs[0] = ROOT_A;
+        inputs[1] = nullifier;
         vm.prank(user);
-        gate.assertCompliant(validProof, publicInputs, nullifier);
+        gate.assertCompliant(validProof, inputs, nullifier);
 
         vm.prank(user);
         vm.expectRevert(
             abi.encodeWithSelector(IComplianceGate.NullifierAlreadyUsed.selector, nullifier)
         );
-        gate.assertCompliant(validProof, publicInputs, nullifier);
+        gate.assertCompliant(validProof, inputs, nullifier);
     }
 }

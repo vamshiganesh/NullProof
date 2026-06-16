@@ -1,4 +1,5 @@
-import { keccak256, toUtf8Bytes } from "ethers";
+import { computeCircuitNullifier, getValidityEpoch, nullifierToHex } from "./nullifier";
+import { addressToValue } from "./circuitImt";
 
 import {
   getUltraHonkBackend,
@@ -138,11 +139,14 @@ export class NullProofProver {
 
     const witnessInput = await prepareNonMembershipWitnessInput(walletAddress);
 
-    const nullifier = this.deriveNullifier(
-      walletAddress,
-      witnessInput.root,
-      witnessInput.lowLeafIndex,
+    const generatedAtMs = Date.now();
+    const validityEpoch = getValidityEpoch(generatedAtMs);
+    const nullifierField = computeCircuitNullifier(
+      addressToValue(walletAddress),
+      BigInt(witnessInput.root),
+      validityEpoch,
     );
+    const nullifier = nullifierToHex(nullifierField);
 
     const witness: Record<string, unknown> = {
       walletAddress,
@@ -168,6 +172,9 @@ export class NullProofProver {
     const backend = await getUltraHonkBackend(this.backendOptions);
     const proofResult = await backend.prove(witness);
 
+    const nullifierFromProof =
+      (proofResult.publicInputs[1] as string | undefined) ?? nullifier;
+
     const generatedAtDate = new Date();
     const generatedAt = generatedAtDate.toISOString();
     const generatedInMs = Math.max(
@@ -183,7 +190,7 @@ export class NullProofProver {
       lowLeafIndex: witnessInput.lowLeafIndex,
       merkleRoot: witnessInput.root,
       root: witnessInput.root,
-      nullifier,
+      nullifier: nullifierFromProof,
       validityWindow: this.validityWindowSeconds,
       validUntil,
       generatedAt,
@@ -368,16 +375,6 @@ export class NullProofProver {
     for (const listener of this.listeners) {
       listener(event);
     }
-  }
-
-  private deriveNullifier(
-    walletAddress: string,
-    root: string,
-    lowLeafIndex: number,
-  ): string {
-    return keccak256(
-      toUtf8Bytes(`${walletAddress.toLowerCase()}:${root}:${lowLeafIndex}`),
-    );
   }
 
   private mapStatusToStep(status: ProofStatus): ProofStepId | null {

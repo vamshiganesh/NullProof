@@ -22,10 +22,14 @@
 # Required Vercel environment variables (set via Vercel dashboard or `vercel env add`):
 #   VITE_COMPLIANCE_GATE_ADDRESS  — deployed ComplianceGate contract address on Sepolia
 #   VITE_SANCTIONS_LIST_ADDRESS   — deployed SanctionsList contract address on Sepolia
-#   VITE_VERIFIER_ADDRESS         — deployed UltraHonk verifier contract address on Sepolia
-#   VITE_ORACLE_BASE_URL          — production oracle backend URL
-#   VITE_WALLETCONNECT_PROJECT_ID — WalletConnect v2 project ID
+#   VITE_VERIFIER_ADDRESS         — deployed HonkVerifier contract address on Sepolia
+#   VITE_SUBMISSION_ROUTER_ADDRESS — deployed SubmissionRouter (relayer entry point)
+#   VITE_COMPLIANT_VAULT_ADDRESS  — deployed CompliantVault (optional demo integration)
+#   VITE_ORACLE_BASE_URL          — production relayer API URL (HTTPS, not the cron oracle)
+#   VITE_WALLETCONNECT_PROJECT_ID — WalletConnect / Reown project ID
 #   VITE_SEPOLIA_RPC_URL          — (optional) Alchemy/Infura Sepolia RPC endpoint
+#   VITE_USE_RELAYER              — "true" for private submission via relayer
+#   VITE_ALLOW_DIRECT_SUBMIT      — "true" to allow wallet-direct fallback in dev
 #
 # Note on VITE_ vars: these are build-time env vars that Vite inlines into the
 # JS bundle. They MUST be present in the Vercel project environment (not just
@@ -111,9 +115,13 @@ jobs:
           VITE_COMPLIANCE_GATE_ADDRESS:  "0x0000000000000000000000000000000000000001"
           VITE_SANCTIONS_LIST_ADDRESS:   "0x0000000000000000000000000000000000000002"
           VITE_VERIFIER_ADDRESS:         "0x0000000000000000000000000000000000000003"
-          VITE_ORACLE_BASE_URL:          "https://oracle.nullproof.xyz"
+          VITE_SUBMISSION_ROUTER_ADDRESS: "0x0000000000000000000000000000000000000004"
+          VITE_COMPLIANT_VAULT_ADDRESS:  "0x0000000000000000000000000000000000000005"
+          VITE_ORACLE_BASE_URL:          "https://relayer.example.com"
           VITE_WALLETCONNECT_PROJECT_ID: "00000000000000000000000000000000"
           VITE_SEPOLIA_RPC_URL:          "https://rpc.sepolia.org"
+          VITE_USE_RELAYER:              "true"
+          VITE_ALLOW_DIRECT_SUBMIT:      "true"
           # Suppress sourcemap generation during smoke check for speed
           NODE_ENV: production
         run: pnpm --filter frontend build

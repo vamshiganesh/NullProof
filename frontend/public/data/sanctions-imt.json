@@ -1,7 +1,7 @@
 {
   "source": "https://www.treasury.gov/ofac/downloads/sdn.xml",
-  "fetchedAt": "2026-06-14T10:40:28.902Z",
-  "builtAt": "2026-06-14T10:40:31.282Z",
+  "fetchedAt": "2026-06-16T17:44:23.342Z",
+  "builtAt": "2026-06-16T17:44:25.977Z",
   "depth": 20,
   "addressCount": 93,
   "root": "0x1e881d272f128d6794f7bf56f9823943dc54c7db6e2c17add5888b10c7a5d843",

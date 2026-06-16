@@ -13,8 +13,10 @@
         "dev": "pnpm --filter nullproof-frontend dev",
         "build": "pnpm --filter nullproof-frontend build",
         "preview": "pnpm --filter nullproof-frontend preview",
-        "oracle:run": "pnpm --filter nullproof-oracle run",
+        "oracle:run": "pnpm --filter nullproof-oracle start",
         "oracle:dev": "pnpm --filter nullproof-oracle dev",
+        "oracle:api": "pnpm --filter nullproof-oracle api",
+        "oracle:dev:api": "pnpm --filter nullproof-oracle dev:api",
         "snapshot": "pnpm --filter nullproof-frontend snapshot",
         "verify-proof": "pnpm --filter nullproof-frontend verify-proof",
         "circuit:compile": "bash scripts/build-circuit.sh",
@@ -31,7 +33,7 @@
         "lint:fix": "eslint . --ext .ts,.tsx --fix",
         "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",
         "format:check": "prettier --check \"**/*.{ts,tsx,json,md,css}\"",
-        "typecheck": "pnpm --filter frontend typecheck && pnpm --filter oracle typecheck",
+        "typecheck": "pnpm --filter nullproof-frontend typecheck && pnpm --filter nullproof-oracle typecheck",
         "clean": "rm -rf frontend/dist oracle/dist contracts/out circuits/target",
         "clean:modules": "find . -name 'node_modules' -type d -not -path '*/forge-std/*' | xargs rm -rf"
     },
@@ -46,10 +48,5 @@
         "prettier": "^3.3.0",
         "tsx": "^4.7.0",
         "typescript": "^5.5.0"
-    },
-    "pnpm": {
-        "overrides": {
-            "typescript": "^5.5.0"
-        }
     }
 }

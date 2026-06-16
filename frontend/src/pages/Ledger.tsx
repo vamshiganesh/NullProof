@@ -43,6 +43,7 @@ import {
   SUPPORTED_CHAIN_NAME,
   BLOCK_EXPLORER_URL,
   DEFAULT_VALIDITY_WINDOW_SECONDS,
+  COMPLIANT_VAULT_ADDRESS,
 } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
@@ -72,7 +73,7 @@ function timeAgo(unixSecs: bigint): string {
 }
 
 function txUrl(hash: Hex): string | null {
-  if (!BLOCK_EXPLORER_URL) return null;
+  if (!BLOCK_EXPLORER_URL || /^0x0+$/i.test(hash)) return null;
   return `${BLOCK_EXPLORER_URL}/tx/${hash}`;
 }
 
@@ -404,36 +405,34 @@ export function Ledger() {
     setLocalError(null);
     startSubmission();
     try {
-      const { writeAssertCompliant, createDefaultPublicClient } = await import("@/lib/chain/contracts");
-      const txHash = await writeAssertCompliant({
+      const { submitAssertCompliant } = await import("@/lib/chain/submitProof");
+      const { txHash, blockNumber } = await submitAssertCompliant({
         proof: proofResult.proof, publicInputs: proofResult.publicInputs,
         nullifier: proofResult.nullifier, account: address,
       });
-      const publicClient = createDefaultPublicClient();
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
       setLocalSubmitting(false);
       setLocalConfirmed(true);
-      setConfirmed({ txHash, confirmedAt: Date.now(), blockNumber: receipt.blockNumber });
+      setConfirmed({ txHash, confirmedAt: Date.now(), blockNumber });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed";
       setLocalSubmitting(false);
 
       if (msg.includes("NullifierAlreadyUsed")) {
-        // Nullifier already consumed on-chain from a prior session.
-        // Resolve the store as confirmed so the UI shows the correct state.
         try {
-          const { readNullifierUsedAt } = await import("@/lib/chain/contracts");
-          const usedAtSecs = await readNullifierUsedAt(proofResult.nullifier);
-          const history    = localStorage.getItem("nullproof:history");
-          const txFromHistory: Hex | null = history
-            ? ((JSON.parse(history) as Array<{ id: string; txHash: string | null }>)
-                .find((e) => e.id === proofResult.nullifier && e.txHash)?.txHash ?? null) as Hex | null
-            : null;
-          const txHash = txFromHistory ?? (("0x" + "00".repeat(32)) as Hex);
-          setLocalConfirmed(true);
-          setConfirmed({ txHash, confirmedAt: Number(usedAtSecs) * 1000, blockNumber: 0n });
+          const { promoteIfNullifierOnChain } = await import("@/lib/proof/resolveSubmission");
+          const promoted = await promoteIfNullifierOnChain(
+            proofResult.nullifier,
+            setConfirmed,
+            submission,
+          );
+          if (promoted) {
+            setLocalConfirmed(true);
+            setLocalError(null);
+            return;
+          }
+          setLocalError("This proof was already submitted. Generate a refreshed proof to renew compliance.");
         } catch {
-          setLocalError("Proof already submitted on-chain — check ZK Proofs history.");
+          setLocalError("Proof already submitted on-chain — refresh the page.");
         }
         return;
       }
@@ -640,6 +639,22 @@ export function Ledger() {
               </div>
             )}
           </Card>
+
+          {COMPLIANT_VAULT_ADDRESS && proofResult && (
+            <Card icon={<LedgerIcon />} title="Compliant Vault Deposit">
+              <p className="mb-3 text-[11px] leading-relaxed text-[#646464]">
+                Deposit ETH through the reference CompliantVault — atomic ZK compliance check plus vault credit in one transaction.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/app/deposit")}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#22c55e]/30 bg-[#22c55e]/8 py-3 text-[13px] font-semibold text-[#4ade80] transition-colors hover:bg-[#22c55e]/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e]/40"
+              >
+                <LedgerIcon className="h-4 w-4" />
+                Deposit via CompliantVault
+              </button>
+            </Card>
+          )}
 
           {/* What this does */}
           <Card icon={<InfoIcon />} title="What this does">

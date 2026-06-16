@@ -25,6 +25,11 @@ import {
   toNoirInputs,
   type NonMembershipWitness,
 } from "@/lib/prover/circuitImt";
+import {
+  computeCircuitNullifier,
+  getValidityEpoch,
+  nullifierToHex,
+} from "@/lib/prover/nullifier";
 
 // ---------------------------------------------------------------------------
 // Message types (re-exported for use by the page)
@@ -96,21 +101,6 @@ function post(msg: WorkerOutMessage): void {
 function toHex(bytes: Uint8Array): string {
   return "0x" + Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-
-async function deriveNullifier(proof: Uint8Array, root: string, address: string): Promise<string> {
-  // Deterministic, one-time-use nullifier binding the proof to (address, root).
-  const enc = new TextEncoder();
-  const combined = new Uint8Array([
-    ...proof.slice(0, 64),
-    ...enc.encode(`${address.toLowerCase()}:${root}`),
-  ]);
-  const digest = await crypto.subtle.digest("SHA-256", combined);
-  return toHex(new Uint8Array(digest));
-}
-
-// ---------------------------------------------------------------------------
-// Main handler
-// ---------------------------------------------------------------------------
 
 self.addEventListener("message", async (event: MessageEvent<WorkerInMessage>) => {
   if (event.data.type !== "PROVE") return;
@@ -223,7 +213,14 @@ self.addEventListener("message", async (event: MessageEvent<WorkerInMessage>) =>
     const circuit = (await circuitRes.json()) as { bytecode: string };
 
     const noir = new noirMod.Noir(circuit as never);
-    const inputs = toNoirInputs(witness);
+    const generatedAt   = Date.now();
+    const validityEpoch = getValidityEpoch(generatedAt);
+    const nullifierField = computeCircuitNullifier(
+      witness.queryValue,
+      witness.root,
+      validityEpoch,
+    );
+    const inputs = toNoirInputs(witness, validityEpoch, nullifierField);
 
     // Execute — runs every constraint. Throws if the address is sanctioned.
     const { witness: solvedWitness } = await noir.execute(inputs as never);
@@ -258,7 +255,7 @@ self.addEventListener("message", async (event: MessageEvent<WorkerInMessage>) =>
     const proofHex     = toHex(rawProof.proof);
     const publicInputs = rawProof.publicInputs;
     const rootUsed     = publicInputs[0] as string;
-    const nullifier    = await deriveNullifier(rawProof.proof, rootUsed, address);
+    const nullifier    = (publicInputs[1] ?? nullifierToHex(nullifierField)) as string;
 
     post({ type: "STEP", payload: { stepId: "validate", state: "done" } });
 
@@ -270,7 +267,7 @@ self.addEventListener("message", async (event: MessageEvent<WorkerInMessage>) =>
       publicInputs,
       nullifier,
       rootUsed,
-      generatedAt: Date.now(),
+      generatedAt,
       elapsedMs:   Date.now() - startedAt,
       witness:     witnessData,
     };

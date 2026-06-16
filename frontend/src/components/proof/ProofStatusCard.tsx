@@ -305,7 +305,7 @@ function ConfirmedCard({
       <div className="divide-y divide-zinc-800/60 px-5">
         <ProofRow label="Tx Hash">
           <a
-            href={txUrl(txHash)}
+            href={txUrl(txHash) ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 font-mono text-xs text-violet-400 hover:text-violet-300 transition-colors"

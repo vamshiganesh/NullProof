@@ -521,7 +521,7 @@ import React, {
                 </span>
                 <CopyBtn value={txHash} label="transaction hash" />
                 <a
-                  href={txUrl(txHash)}
+                  href={txUrl(txHash)!}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="View transaction on Etherscan"
@@ -671,7 +671,7 @@ import React, {
         <div className="flex flex-col gap-2 px-5 pb-5 pt-4 sm:flex-row">
           {/* Etherscan CTA */}
           <a
-            href={txUrl(txHash)}
+            href={txUrl(txHash)!}
             target="_blank"
             rel="noopener noreferrer"
             className={[

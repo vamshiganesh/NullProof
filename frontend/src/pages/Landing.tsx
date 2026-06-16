@@ -16,7 +16,7 @@ import { useAccount } from "wagmi";
 import {
   DEFAULT_VALIDITY_WINDOW_SECONDS,
 } from "@/lib/constants";
-import { ConnectWalletButton } from "@/components/wallet";
+import { ConnectWalletButton, WalletBadge } from "@/components/wallet";
 
 const GITHUB_URL = "https://github.com/vamshiganesh/NullProof";
 
@@ -104,12 +104,12 @@ function TopNav() {
       ].join(" ")}
       style={{ height: NAV_H }}
     >
-      <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-5 sm:px-8">
+      <div className="relative mx-auto grid h-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 sm:px-8">
 
         {/* Logo */}
         <Link
           to="/"
-          className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#22c55e]/60 rounded"
+          className="flex items-center gap-2 rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#22c55e]/60 justify-self-start"
           aria-label="NullProof home"
         >
           <span className="text-[15px] font-bold tracking-tight text-white">
@@ -120,7 +120,7 @@ function TopNav() {
           </span>
         </Link>
 
-        {/* Desktop links */}
+        {/* Center links — true horizontal center of the bar */}
         <nav className="hidden items-center gap-7 md:flex" aria-label="Site links">
           {[
             { label: "Documentation", href: "/#how-it-works" },
@@ -153,9 +153,10 @@ function TopNav() {
           )}
         </nav>
 
-        {/* Right: connect wallet */}
-        <div className="flex items-center gap-3">
-          <ConnectWalletButton />
+        {/* Right: wallet + mobile menu */}
+        <div className="flex items-center justify-end gap-3 justify-self-end">
+          <ConnectWalletButton variant="landing" />
+          <WalletBadge showBalance={false} />
 
           {/* Mobile hamburger */}
           <button
@@ -301,8 +302,8 @@ interface StatItem {
 
 const STATS: StatItem[] = [
   {
-    value:  "~3,400",
-    label:  "Sanctioned ETH addresses",
+    value:  "Zero",
+    label:  "On-chain address exposure",
     accent: true,
   },
   {
@@ -311,7 +312,7 @@ const STATS: StatItem[] = [
     accent: false,
   },
   {
-    value:  "<30s",
+    value:  "<3s",
     label:  "Avg. proof generation time",
     accent: false,
   },
@@ -471,7 +472,7 @@ function Footer() {
 
         {/* Copyright */}
         <span className="text-[12px] text-[#646464]">
-          © 2024 NullProof Protocol. All rights reserved.
+          © 2026 NullProof Protocol. All rights reserved.
         </span>
 
         {/* Links */}

@@ -1,18 +1,16 @@
 /**
  * writeSnapshot.ts
  *
- * Serialises the IMT snapshot to a JSON file consumed by the frontend prover.
- * Also writes a lightweight manifest (imt-manifest.json) with just the root
- * and metadata — so the frontend can check freshness without loading the full
- * snapshot.
+ * Writes imt-manifest.json beside sanctions-imt.json so the frontend can
+ * check snapshot freshness without loading the full entry list.
  */
 
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve }  from "node:path";
 import { fileURLToPath }     from "node:url";
 
-import type { IMTSnapshot }  from "./buildIMT.js";
-import type { PublishResult } from "./publishRoot.js";
+import type { CircuitSnapshot } from "./buildCircuitSnapshot.js";
+import type { PublishResult }   from "./publishRoot.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,10 +33,15 @@ export interface WriteSnapshotResult {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function resolveOutputPath(envPath: string | undefined, fallback: string): string {
-  const raw = envPath?.trim() || fallback;
-  // Resolve relative to oracle/ root (one level up from src/)
-  return resolve(__dirname, "..", raw);
+function resolveManifestPath(): string {
+  const envPath = process.env["MANIFEST_PATH"]?.trim();
+  if (envPath) {
+    return resolve(__dirname, "..", envPath);
+  }
+  return resolve(
+    __dirname,
+    "../../frontend/public/data/imt-manifest.json",
+  );
 }
 
 async function ensureDir(filePath: string): Promise<void> {
@@ -48,49 +51,36 @@ async function ensureDir(filePath: string): Promise<void> {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**
- * Write the full IMT snapshot + lightweight manifest to disk.
- *
- * @param snapshot - Output of buildIMT()
- * @param publish  - Output of publishRoot()
+ * Write the lightweight manifest after a successful on-chain publish.
+ * The full snapshot lives at frontend/public/data/sanctions-imt.json.
  */
-export async function writeSnapshot(
-  snapshot: IMTSnapshot,
+export async function writeManifest(
+  snapshot: CircuitSnapshot,
   publish:  PublishResult,
 ): Promise<WriteSnapshotResult> {
-  // ── 1. Resolve output paths ────────────────────────────────────────────────
-  const snapshotPath = resolveOutputPath(
-    process.env["SNAPSHOT_PATH"],
-    "../frontend/data/imt-snapshot.json",
+  const snapshotPath = resolve(
+    __dirname,
+    "../../frontend/public/data/sanctions-imt.json",
   );
+  const manifestPath = resolveManifestPath();
 
-  const manifestPath = snapshotPath.replace(
-    "imt-snapshot.json",
-    "imt-manifest.json",
-  );
-
-  // ── 2. Build manifest ──────────────────────────────────────────────────────
   const manifest: SnapshotManifest = {
     root:         snapshot.root,
     addressCount: snapshot.addressCount,
     builtAt:      snapshot.builtAt,
     publishedAt:  publish.publishedAt.toISOString(),
-    txHash:       publish.txHash,
+    txHash:       publish.txHash || "0x0000000000000000000000000000000000000000000000000000000000000000",
     blockNumber:  publish.blockNumber,
   };
 
-  // ── 3. Write both files ────────────────────────────────────────────────────
-  await ensureDir(snapshotPath);
   await ensureDir(manifestPath);
 
-  const snapshotJson = JSON.stringify(snapshot, null, 2);
   const manifestJson = JSON.stringify(manifest, null, 2);
-
-  await writeFile(snapshotPath, snapshotJson, "utf-8");
   await writeFile(manifestPath, manifestJson, "utf-8");
 
   return {
     snapshotPath,
     manifestPath,
-    bytesWritten: snapshotJson.length + manifestJson.length,
+    bytesWritten: manifestJson.length,
   };
 }

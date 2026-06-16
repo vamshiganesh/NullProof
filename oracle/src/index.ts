@@ -3,37 +3,32 @@
  *
  * Oracle entry point. Runs the full pipeline once on startup, then
  * reschedules via cron. Steps:
- *   1. fetchOFACAddresses  — download + parse OFAC SDN XML
- *   2. buildIMT            — hash addresses, build depth-20 IMT
- *   3. publishRoot         — broadcast updateRoot() to Sepolia
- *   4. writeSnapshot       — serialise tree to frontend/data/
+ *   1. buildCircuitSnapshot — fetch OFAC + build CircuitIMT (sanctions-imt.json)
+ *   2. publishRoot          — broadcast updateRoot() to Sepolia
+ *   3. writeManifest        — write imt-manifest.json for freshness checks
  */
 
-import { createRequire }      from "node:module";
-import { writeFile }          from "node:fs/promises";
-import { resolve, dirname }   from "node:path";
-import { fileURLToPath }      from "node:url";
+import { createRequire }    from "node:module";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath }    from "node:url";
 
-import { fetchOFACAddresses } from "./fetchOFAC.js";
-import { buildIMT }           from "./buildIMT.js";
-import { publishRoot }        from "./publishRoot.js";
-import { writeSnapshot }      from "./writeSnapshot.js";
+import { buildCircuitSnapshot } from "./buildCircuitSnapshot.js";
+import { publishRoot, RootUnchangedError } from "./publishRoot.js";
+import { writeManifest }        from "./writeSnapshot.js";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 
-// Load .env before anything else
-const require    = createRequire(import.meta.url);
-const __dirname  = dirname(fileURLToPath(import.meta.url));
+const require   = createRequire(import.meta.url);
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 try {
-  // dotenv is a common dep — use dynamic require so missing it is non-fatal
   const dotenv = require("dotenv") as { config: (o: { path: string }) => void };
   dotenv.config({ path: resolve(__dirname, "../.env") });
 } catch {
   // Running in production with env vars injected directly — fine
 }
 
-// ── Logger (inline — avoids circular dep before logger.ts exists) ─────────────
+// ── Logger ────────────────────────────────────────────────────────────────────
 
 function log(level: "info" | "warn" | "error", msg: string, meta?: unknown): void {
   const line = JSON.stringify({
@@ -48,51 +43,68 @@ function log(level: "info" | "warn" | "error", msg: string, meta?: unknown): voi
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
-const MIN_ADDRESS_COUNT = Number(process.env["MIN_ADDRESS_COUNT"] ?? 100);
+const MIN_ADDRESS_COUNT = Number(process.env["MIN_ADDRESS_COUNT"] ?? 50);
 
 async function runPipeline(): Promise<void> {
   log("info", "pipeline.start");
 
-  // ── Step 1: Fetch ──────────────────────────────────────────────────────────
-  log("info", "ofac.fetch.start");
-  const ofac = await fetchOFACAddresses();
-  log("info", "ofac.fetch.done", {
-    addressCount: ofac.addressCount,
-    sourceUrl:    ofac.sourceUrl,
-    fetchedAt:    ofac.fetchedAt.toISOString(),
+  // ── Step 1: Build circuit-exact snapshot (writes sanctions-imt.json) ────────
+  log("info", "snapshot.build.start");
+  const snapshot = await buildCircuitSnapshot();
+  log("info", "snapshot.build.done", {
+    root:         snapshot.root,
+    addressCount: snapshot.addressCount,
+    builtAt:      snapshot.builtAt,
   });
 
-  if (ofac.addressCount < MIN_ADDRESS_COUNT) {
+  if (snapshot.addressCount < MIN_ADDRESS_COUNT) {
     throw new Error(
-      `Sanity check failed: only ${ofac.addressCount} addresses parsed ` +
+      `Sanity check failed: only ${snapshot.addressCount} addresses parsed ` +
       `(minimum ${MIN_ADDRESS_COUNT}). Feed may be empty or malformed.`,
     );
   }
 
-  // ── Step 2: Build IMT ──────────────────────────────────────────────────────
-  log("info", "imt.build.start", { addressCount: ofac.addressCount });
-  const { root, tree, snapshot } = buildIMT(ofac.addresses);
-  log("info", "imt.build.done", { root });
-
-  // ── Step 3: Publish root ───────────────────────────────────────────────────
-  log("info", "publish.start", { root, addressCount: ofac.addressCount });
-  const publish = await publishRoot(root, ofac.addressCount);
-  log("info", "publish.done", {
-    txHash:      publish.txHash,
-    blockNumber: publish.blockNumber,
-    gasUsed:     publish.gasUsed.toString(),
+  // ── Step 2: Publish root ───────────────────────────────────────────────────
+  log("info", "publish.start", {
+    root:         snapshot.root,
+    addressCount: snapshot.addressCount,
   });
 
-  // ── Step 4: Write snapshot ─────────────────────────────────────────────────
-  log("info", "snapshot.write.start");
-  const written = await writeSnapshot(snapshot, publish);
-  log("info", "snapshot.write.done", {
+  let publish: Awaited<ReturnType<typeof publishRoot>>;
+  try {
+    publish = await publishRoot(snapshot.root, snapshot.addressCount);
+    log("info", "publish.done", {
+      txHash:      publish.txHash,
+      blockNumber: publish.blockNumber,
+      gasUsed:     publish.gasUsed.toString(),
+    });
+  } catch (err) {
+    if (err instanceof RootUnchangedError) {
+      log("info", "publish.skipped", { reason: err.message, root: err.root });
+      publish = {
+        txHash:       "",
+        blockNumber:  0,
+        previousRoot: err.previousRoot,
+        newRoot:      err.root,
+        addressCount: snapshot.addressCount,
+        gasUsed:      0n,
+        publishedAt:  new Date(),
+      };
+    } else {
+      throw err;
+    }
+  }
+
+  // ── Step 3: Write manifest ─────────────────────────────────────────────────
+  log("info", "manifest.write.start");
+  const written = await writeManifest(snapshot, publish);
+  log("info", "manifest.write.done", {
     snapshotPath: written.snapshotPath,
     manifestPath: written.manifestPath,
     bytesWritten: written.bytesWritten,
   });
 
-  log("info", "pipeline.done", { root, txHash: publish.txHash });
+  log("info", "pipeline.done", { root: snapshot.root, txHash: publish.txHash });
 }
 
 // ── Scheduler ─────────────────────────────────────────────────────────────────
@@ -100,7 +112,6 @@ async function runPipeline(): Promise<void> {
 async function startScheduler(): Promise<void> {
   const cronExpr = process.env["CRON_SCHEDULE"] ?? "5 0 * * *";
 
-  // Dynamically import node-cron — add to deps only if needed
   type CronScheduler = { schedule: (expr: string, fn: () => void) => void };
   let cron: CronScheduler | undefined = undefined;
   try {
@@ -109,7 +120,6 @@ async function startScheduler(): Promise<void> {
     log("warn", "node-cron not installed — running once and exiting");
   }
 
-  // Always run immediately on startup
   try {
     await runPipeline();
   } catch (err) {
@@ -126,7 +136,6 @@ async function startScheduler(): Promise<void> {
       await runPipeline();
     } catch (err) {
       log("error", "pipeline.failed", { error: String(err) });
-      // Don't exit — keep scheduler alive for next run
     }
   });
 }

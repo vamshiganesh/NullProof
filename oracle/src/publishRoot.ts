@@ -17,9 +17,9 @@ import {
 // ── Minimal ABI — only what we need ──────────────────────────────────────────
 
 const SANCTIONS_LIST_ABI = [
-  // Read
-  "function latestRoot() external view returns (bytes32)",
-  "function addressCount() external view returns (uint256)",
+  // Read — must match SanctionsList.sol / ISanctionsList
+  "function currentRoot() external view returns (bytes32)",
+  "function currentAddressCount() external view returns (uint256)",
 
   // Write
   "function updateRoot(bytes32 newRoot, uint256 newAddressCount) external",
@@ -27,6 +27,19 @@ const SANCTIONS_LIST_ABI = [
   // Events
   "event RootUpdated(bytes32 indexed previousRoot, bytes32 indexed newRoot, uint256 addressCount, uint256 updatedAt)",
 ] as const;
+
+/** Thrown when the on-chain root already matches the computed snapshot. */
+export class RootUnchangedError extends Error {
+  readonly previousRoot: string;
+  readonly root:         string;
+
+  constructor(previousRoot: string, root: string) {
+    super(`publishRoot: root unchanged (${root}) — skipping publish`);
+    this.name = "RootUnchangedError";
+    this.previousRoot = previousRoot;
+    this.root = root;
+  }
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -97,14 +110,12 @@ export async function publishRoot(
   );
 
   // ── 2. Read current state ──────────────────────────────────────────────────
-  const previousRoot = await contract.getFunction("latestRoot")() as string;
+  const previousRoot = await contract.getFunction("currentRoot")() as string;
   const normRoot     = normaliseRoot(root);
 
   // Skip if root hasn't changed — saves gas on quiet days
   if (previousRoot.toLowerCase() === normRoot.toLowerCase()) {
-    throw new Error(
-      `publishRoot: root unchanged (${normRoot}) — skipping publish`,
-    );
+    throw new RootUnchangedError(previousRoot, normRoot);
   }
 
   // ── 3. Estimate gas & send ─────────────────────────────────────────────────

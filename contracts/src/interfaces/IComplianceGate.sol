@@ -15,6 +15,9 @@ interface IComplianceGate {
     // Errors
     // -------------------------------------------------------------------------
 
+    /// @notice Thrown when calldata nullifier does not match the proof public input.
+    error NullifierMismatch(bytes32 expected, bytes32 provided);
+
     /// @notice Thrown when a submitted proof fails on-chain verification.
     error InvalidProof();
 
@@ -69,8 +72,8 @@ interface IComplianceGate {
     ///      their deposit() or swap() function. Reverts on any compliance failure.
     ///      On success, the nullifier is consumed and cannot be reused.
     /// @param proof        Serialized UltraHonk proof bytes from the browser prover.
-    /// @param publicInputs Array of public field elements. Index 0 must be the
-    ///                     sanctions list Merkle root the proof was generated against.
+    /// @param publicInputs Array of public field elements. Index 0 = Merkle root,
+    ///                     index 1 = nullifier bound in-circuit.
     /// @param nullifier    A unique commitment derived from the proof, used to prevent
     ///                     the same proof being submitted twice.
     function assertCompliant(

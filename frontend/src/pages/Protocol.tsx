@@ -444,19 +444,22 @@ function CircuitGraph({
     { id: "merkle",   cx: 630, cy: 160, w: 170, h: 110 },
   ];
 
+  const [rangeBox, poseidonBox, merkleBox] = boxes;
+  if (!rangeBox || !poseidonBox || !merkleBox) return null;
+
   // Edge definitions (from right edge → left edge of next node, curved)
   const edges = [
     {
       id:    "range-poseidon",
-      x1: boxes[0].cx + boxes[0].w / 2, y1: boxes[0].cy,
-      x2: boxes[1].cx - boxes[1].w / 2, y2: boxes[1].cy,
+      x1: rangeBox.cx + rangeBox.w / 2, y1: rangeBox.cy,
+      x2: poseidonBox.cx - poseidonBox.w / 2, y2: poseidonBox.cy,
       label: "u64s + gap",
       color: "#3b82f6",
     },
     {
       id:    "poseidon-merkle",
-      x1: boxes[1].cx + boxes[1].w / 2, y1: boxes[1].cy,
-      x2: boxes[2].cx - boxes[2].w / 2, y2: boxes[2].cy,
+      x1: poseidonBox.cx + poseidonBox.w / 2, y1: poseidonBox.cy,
+      x2: merkleBox.cx - merkleBox.w / 2, y2: merkleBox.cy,
       label: "hashes",
       color: "#22c55e",
     },
@@ -517,7 +520,7 @@ function CircuitGraph({
         })}
 
         {/* Output line */}
-        <line x1={boxes[2].cx + boxes[2].w / 2} y1={boxes[2].cy}
+        <line x1={merkleBox.cx + merkleBox.w / 2} y1={merkleBox.cy}
           x2={OUTPUT.x - 10} y2={OUTPUT.y}
           stroke="#22c55e" strokeWidth="1" strokeDasharray="3 3" />
         <text x={OUTPUT.x + 2} y={OUTPUT.y + 5} fontSize="8" fill="#22c55e" fontFamily="ui-monospace,monospace">
@@ -941,7 +944,9 @@ export function Protocol() {
             <KpiCard
               label="Last Updated"
               value={lastUpdatedAt !== null && lastUpdatedAt > 0n ? timeAgo(lastUpdatedAt) : "—"}
-              sub={lastUpdatedAt !== null && lastUpdatedAt > 0n ? formatTs(lastUpdatedAt) : undefined}
+              {...(lastUpdatedAt !== null && lastUpdatedAt > 0n
+                ? { sub: formatTs(lastUpdatedAt) }
+                : {})}
               icon={<CalendarIcon className="h-4 w-4" />}
               loading={isLoading}
             />

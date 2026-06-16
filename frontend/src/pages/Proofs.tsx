@@ -37,6 +37,7 @@ import React, {
     DEFAULT_VALIDITY_WINDOW_SECONDS,
     txUrl,
   } from "@/lib/constants";
+  import { isPlaceholderTxHash, readHistoryConfirmedMeta, readHistorySubmission } from "@/lib/proof/resolveSubmission";
   
   // ---------------------------------------------------------------------------
   // Types
@@ -86,6 +87,14 @@ import React, {
    */
   function upsertEntry(entry: ProofHistoryEntry): void {
     const existing = readHistory();
+    const prev = existing.find((e) => e.id === entry.id);
+    if (entry.pending && prev) {
+      const wasConfirmed =
+        (prev.txHash && !isPlaceholderTxHash(prev.txHash)) ||
+        prev.confirmedAt !== null ||
+        prev.pending === false;
+      if (wasConfirmed) return;
+    }
     const filtered = existing.filter((e) => e.id !== entry.id);
     writeHistory([entry, ...filtered]);
   }
@@ -138,9 +147,14 @@ import React, {
   // ---------------------------------------------------------------------------
   
   function isEntryActive(entry: ProofHistoryEntry): boolean {
+    if (entry.pending) return false;
     const refTime = entry.confirmedAt ?? entry.generatedAt;
     const elapsed = Date.now() - refTime;
     return elapsed < Number(DEFAULT_VALIDITY_WINDOW_SECONDS) * 1000;
+  }
+
+  function isEntrySubmitted(entry: ProofHistoryEntry): boolean {
+    return !entry.pending && (entry.confirmedAt !== null || !!entry.txHash);
   }
   
   function proofRemainingPct(entry: ProofHistoryEntry): number {
@@ -166,9 +180,10 @@ import React, {
     const [stored, setStored] = useState<ProofHistoryEntry[]>(() => readHistory());
   
     // Persist to localStorage as soon as a proof is generated (pending).
-    // This survives navigation and page refresh without needing on-chain confirmation.
+    // Skip if this nullifier already has a confirmed on-chain submission.
     useEffect(() => {
       if (proofStatus === "generated" && proofResult !== null) {
+        if (readHistorySubmission(proofResult.nullifier)) return;
         upsertEntry(buildPendingEntry(proofResult, elapsedMs));
         setStored(readHistory());
       }
@@ -191,10 +206,27 @@ import React, {
     // Merge: live store entry (confirmed or pending) + stored (dedup by id)
     const entries = useMemo<ProofHistoryEntry[]>(() => {
       let liveEntry: ProofHistoryEntry | null = null;
+
       if (proofStatus === "confirmed" && proofResult && submission) {
         liveEntry = buildEntry(proofResult, submission, elapsedMs);
-      } else if (proofStatus === "generated" && proofResult) {
-        liveEntry = buildPendingEntry(proofResult, elapsedMs);
+      } else if (proofResult) {
+        const confirmed = readHistorySubmission(proofResult.nullifier);
+        if (confirmed) {
+          liveEntry = buildEntry(proofResult, confirmed, elapsedMs);
+        } else if (proofStatus === "confirmed" && submission) {
+          liveEntry = buildEntry(proofResult, submission, elapsedMs);
+        } else if (readHistoryConfirmedMeta(proofResult.nullifier)) {
+          // Submitted on-chain but tx hash still resolving — use store submission if any.
+          if (submission) {
+            liveEntry = buildEntry(proofResult, submission, elapsedMs);
+          }
+        } else if (
+          proofStatus === "generated" ||
+          proofStatus === "error" ||
+          proofStatus === "submitting"
+        ) {
+          liveEntry = buildPendingEntry(proofResult, elapsedMs);
+        }
       }
   
       const all = liveEntry
@@ -322,7 +354,11 @@ import React, {
               Block
             </p>
             <span className="font-mono text-[11px] text-zinc-400">
-              {entry.blockNumber ? `#${entry.blockNumber}` : "Not submitted"}
+              {entry.blockNumber && entry.blockNumber !== "0"
+                ? `#${entry.blockNumber}`
+                : isEntrySubmitted(entry)
+                ? "On-chain"
+                : "Not submitted"}
             </span>
           </div>
   
@@ -397,7 +433,8 @@ import React, {
   }) {
     const [expanded, setExpanded] = useState(false);
     const active = isEntryActive(entry);
-  
+    const submitted = isEntrySubmitted(entry);
+
     return (
       <div
         className={[
@@ -437,7 +474,7 @@ import React, {
               <span className="font-mono text-xs font-medium text-zinc-300">
                 {formatNullifier(entry.nullifier)}
               </span>
-              <StatusBadge active={active} pending={entry.pending} />
+              <StatusBadge active={active} pending={!submitted} />
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
               <span className="text-[11px] text-zinc-600">
@@ -453,9 +490,9 @@ import React, {
           {/* Right side */}
           <div className="flex shrink-0 items-center gap-3">
             {/* Tx link — only for confirmed proofs */}
-            {entry.txHash && (
+            {entry.txHash && txUrl(entry.txHash) && (
               <a
-                href={txUrl(entry.txHash)}
+                href={txUrl(entry.txHash)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -466,7 +503,7 @@ import React, {
                 <ExternalLinkIcon className="h-2.5 w-2.5" />
               </a>
             )}
-            {entry.pending && (
+            {!submitted && (
               <Link
                 to="/app/proof/ready"
                 onClick={(e) => e.stopPropagation()}
@@ -620,9 +657,10 @@ import React, {
       return () => clearTimeout(id);
     }, []);
   
-    // Stats
-    const activeCount  = entries.filter(isEntryActive).length;
-    const expiredCount = entries.length - activeCount;
+    // Stats — "active" means submitted on-chain and within validity window
+    const activeCount    = entries.filter(isEntryActive).length;
+    const pendingCount   = entries.filter((e) => !isEntrySubmitted(e)).length;
+    const expiredCount   = entries.filter((e) => isEntrySubmitted(e) && !isEntryActive(e)).length;
   
     const handleClearConfirm = useCallback(() => {
       clearHistory();
@@ -662,6 +700,11 @@ import React, {
                     <span className="inline-flex items-center gap-1.5 rounded-lg border border-teal-500/20 bg-teal-500/8 px-2.5 py-1 text-[11px] font-medium text-teal-500">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-400" aria-hidden="true" />
                       {activeCount} active
+                    </span>
+                  )}
+                  {pendingCount > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#22c55e]/20 bg-[#22c55e]/8 px-2.5 py-1 text-[11px] font-medium text-[#4ade80]">
+                      {pendingCount} not submitted
                     </span>
                   )}
                 </>
@@ -759,7 +802,7 @@ import React, {
               style={{ transitionDelay: `${entries.length * 55 + 200}ms` }}
             >
               History is stored locally in this browser.
-              On-chain proofs remain valid independently of this list.
+              After the 24 h window, generate a refreshed proof to renew — each period uses a unique nullifier.
             </p>
           )}
         </div>

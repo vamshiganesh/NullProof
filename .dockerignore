@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+frontend/dist
+contracts/out
+contracts/cache
+circuit/target
+oracle/dist
+
+# Git / IDE
+.git
+.cursor
+.vscode
+
+# Env secrets
+**/.env
+**/.env.local
+
+# Large / irrelevant for relayer image
+contracts
+circuit
+frontend/src
+frontend/public/circuits
+frontend/dist
+*.md

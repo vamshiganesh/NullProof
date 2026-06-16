@@ -35,7 +35,17 @@
   },
   {
     "inputs": [],
-    "name": "ProofLengthWrong",
+    "name": "InvertOfZero",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotPowerOfTwo",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PointAtInfinity",
     "type": "error"
   },
   {
@@ -72,6 +82,21 @@
   {
     "inputs": [],
     "name": "SumcheckFailed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValueGeFieldOrder",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValueGeGroupOrder",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValueGeLimbMax",
     "type": "error"
   }
 ]

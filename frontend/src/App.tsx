@@ -10,6 +10,7 @@
 //   /app/proof                 → <Proofs>            (proof history list)
 //   /app/proof/generate        → <ProofGenerate>     (proof wizard)
 //   /app/proof/ready           → <ProofReady>        (proof ready / submit)
+//   /app/deposit               → <Deposit>             (CompliantVault deposit)
 //   /app/deposit/confirmed     → <DepositConfirmed>  (post-deposit success)
 //   /app/protocol              → <Protocol>          (tab shell: overview | circuit | contract | benchmarks)
 //   /app/protocol/circuit      → redirect → /app/protocol?tab=circuit
@@ -52,6 +53,7 @@ import {
   useProofStore,
   selectProofStatus,
   selectProofResult,
+  selectSubmission,
 } from "@/store/proofStore";
 import type { Hex } from "viem";
 
@@ -68,6 +70,7 @@ const Proofs          = React.lazy(() => import("@/pages/Proofs"));
 const ProofGenerate   = React.lazy(() => import("@/pages/ProofGenerate"));
 const ProofReady      = React.lazy(() => import("@/pages/ProofReady"));
 const DepositConfirmed = React.lazy(() => import("@/pages/DepositConfirmed"));
+const Deposit           = React.lazy(() => import("@/pages/Deposit"));
 const Protocol        = React.lazy(() => import("@/pages/Protocol"));
 const ProtocolCircuit = React.lazy(() => import("@/pages/ProtocolCircuit"));
 const Ledger          = React.lazy(() => import("@/pages/Ledger"));
@@ -141,57 +144,58 @@ function ScrollToTop() {
 // ---------------------------------------------------------------------------
 // NullifierReconciler — renderless, always mounted inside AppShell.
 //
-// After a page refresh the store is hydrated from localStorage with
-// status="generated". If the nullifier was already submitted on-chain in a
-// previous session, the contract will reject a re-submission with
-// NullifierAlreadyUsed. This component proactively detects that case and
-// silently transitions the store to "confirmed" so Dashboard and Ledger
-// display the correct ACTIVE / verified state.
+// After a page refresh the store may be hydrated without a real tx hash.
+// If the nullifier was already submitted on-chain, this component resolves
+// the submission from localStorage or ComplianceGate events and updates the
+// store so Dashboard / Ledger / ProofReady show the correct Etherscan link.
 // ---------------------------------------------------------------------------
-
-function _readHistoryTxHash(nullifier: string): Hex | null {
-  try {
-    const raw = localStorage.getItem("nullproof:history");
-    if (!raw) return null;
-    const entries = JSON.parse(raw) as Array<{ id: string; txHash: string | null }>;
-    const match = entries.find((e) => e.id === nullifier && e.txHash);
-    return (match?.txHash ?? null) as Hex | null;
-  } catch {
-    return null;
-  }
-}
 
 function NullifierReconciler() {
   const proofStatus  = useProofStore(selectProofStatus);
   const proofResult  = useProofStore(selectProofResult);
+  const submission   = useProofStore(selectSubmission);
   const setConfirmed = useProofStore((s) => s.setConfirmed);
 
   const nullifier = proofResult?.nullifier ?? null;
+  const txHash    = submission?.txHash ?? null;
 
   useEffect(() => {
-    if (proofStatus !== "generated" || !nullifier) return;
+    if (!nullifier) return;
+
     let cancelled = false;
-    void (async () => {
+
+    async function reconcile() {
+      if (cancelled) return;
       try {
-        const { readIsNullifierUsed, readNullifierUsedAt } =
-          await import("@/lib/chain/contracts");
-        const used = await readIsNullifierUsed(nullifier as Hex);
-        if (!used || cancelled) return;
-        const usedAtSecs = await readNullifierUsedAt(nullifier as Hex);
-        if (cancelled) return;
-        const txHash =
-          _readHistoryTxHash(nullifier) ?? (("0x" + "00".repeat(32)) as Hex);
-        setConfirmed({
-          txHash,
-          confirmedAt: Number(usedAtSecs) * 1000,
-          blockNumber: 0n,
-        });
+        const { isPlaceholderTxHash, promoteIfNullifierOnChain } =
+          await import("@/lib/proof/resolveSubmission");
+        const state = useProofStore.getState();
+
+        const needsTx =
+          state.status !== "confirmed" ||
+          state.submission === null ||
+          isPlaceholderTxHash(state.submission.txHash);
+
+        if (!needsTx) return;
+
+        await promoteIfNullifierOnChain(
+          nullifier as Hex,
+          setConfirmed,
+          state.submission,
+        );
       } catch {
-        // Network error — ignore; the user can still attempt submission
+        /* retry on next tick */
       }
-    })();
-    return () => { cancelled = true; };
-  }, [nullifier, proofStatus, setConfirmed]);
+    }
+
+    void reconcile();
+    const interval = setInterval(() => { void reconcile(); }, 8_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [nullifier, proofStatus, txHash, setConfirmed]);
 
   return null;
 }
@@ -284,8 +288,9 @@ function AppRoutes() {
           <Route path="ready" element={<ProofReady />} />
         </Route>
 
-        {/* Post-deposit success screen */}
+        {/* CompliantVault deposit + post-deposit success */}
         <Route path="deposit">
+          <Route index element={<Deposit />} />
           <Route path="confirmed" element={<DepositConfirmed />} />
         </Route>
 

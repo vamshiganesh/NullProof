@@ -7,6 +7,8 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
+    "api": "tsx src/server.ts",
+    "dev:api": "tsx watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts"
   },
@@ -14,11 +16,13 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.4",
     "@zk-kit/imt": "^2.0.0-beta.8",
     "axios": "^1.7.2",
     "dotenv": "^17.4.2",
     "ethers": "^6.13.1",
     "fast-xml-parser": "^4.4.0",
+    "hono": "^4.12.25",
     "winston": "^3.13.0"
   },
   "devDependencies": {

@@ -56,6 +56,11 @@ export function hashPair(left: bigint, right: bigint): bigint {
   return fmod((left + 17n) * (right + 31n) + left + right + 97n);
 }
 
+/** hash_triple(a, b, c) = hash_pair(hash_pair(a, b), c) — matches circuit/src/hash/poseidon.nr */
+export function hashTriple(a: bigint, b: bigint, c: bigint): bigint {
+  return hashPair(hashPair(a, b), c);
+}
+
 /** hash_leaf(value, next_value, next_index) = hash_pair(hash_pair(v, nv), ni) */
 export function hashLeaf(value: bigint, nextValue: bigint, nextIndex: bigint): bigint {
   return hashPair(hashPair(value, nextValue), nextIndex);
@@ -261,7 +266,11 @@ export function toFieldHex(v: bigint): string {
  * Format a witness into the exact input map expected by the compiled circuit's
  * ABI (see frontend/public/circuits/nullproof.json).
  */
-export function toNoirInputs(w: NonMembershipWitness): Record<string, unknown> {
+export function toNoirInputs(
+  w: NonMembershipWitness,
+  validityEpoch: number,
+  nullifier: bigint,
+): Record<string, unknown> {
   return {
     query_value:         w.queryValue.toString(),
     low_leaf_value:      w.lowLeafValue.toString(),
@@ -269,6 +278,8 @@ export function toNoirInputs(w: NonMembershipWitness): Record<string, unknown> {
     low_leaf_next_index: w.lowLeafNextIndex.toString(),
     siblings:            w.siblings.map(toFieldHex),
     path_indices:        w.pathIndices,
+    validity_epoch:      validityEpoch.toString(),
     root:                toFieldHex(w.root),
+    nullifier:           toFieldHex(nullifier),
   };
 }

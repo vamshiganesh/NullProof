@@ -9,10 +9,10 @@
 #
 #   Job 1 — run-oracle
 #     1a. Install oracle dependencies
-#     1b. Run the full oracle pipeline (fetchOFAC → buildIMT → publishRoot → writeSnapshot)
-#         This writes two files into frontend/data/:
-#           • imt-snapshot.json  — full IMT leaf/path data consumed by the in-browser prover
-#           • imt-manifest.json  — lightweight metadata (root, addressCount, txHash, timestamps)
+#     1b. Run the full oracle pipeline (buildCircuitSnapshot → publishRoot → writeManifest)
+#         This writes/updates:
+#           • frontend/public/data/sanctions-imt.json  — circuit-exact IMT (in-browser prover)
+#           • frontend/public/data/imt-manifest.json     — root, txHash, timestamps
 #     1c. Detect whether either file actually changed
 #     1d. If changed: commit + push to main as github-actions[bot]
 #         If unchanged: skip commit and skip redeploy (root was same — oracle exits with a
@@ -34,10 +34,9 @@
 #   VERCEL_PROJECT_ID        — From .vercel/project.json → "projectId"
 #
 # Optional repository secrets / variables:
-#   MIN_ADDRESS_COUNT        — Sanity floor (default: 100). Set as a repo variable,
-#                              not a secret, since it is not sensitive.
+#   MIN_ADDRESS_COUNT        — Sanity floor (default: 50). OFAC has ~90 ETH addresses.
 #   ORACLE_CONFIRMATIONS     — Blocks to wait for tx confirmation (default: 2)
-#   SNAPSHOT_PATH            — Override output path (default: ../frontend/data/imt-snapshot.json)
+#   MANIFEST_PATH            — Override manifest path (default: ../frontend/public/data/imt-manifest.json)
 #
 # Security notes:
 #   • ORACLE_PRIVATE_KEY is the most sensitive secret in this repository.
@@ -75,7 +74,7 @@ on:
         description: "Override minimum address count sanity check"
         type: number
         required: false
-        default: 100
+        default: 50
 
 # Prevent two snapshot updates running concurrently.
 # If a manual dispatch fires while the cron is mid-run, cancel the cron.
@@ -139,11 +138,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      # Install only the oracle package's dependencies.
-      # --frozen-lockfile ensures reproducible installs.
-      # We use --filter to avoid building the frontend unnecessarily.
-      - name: Install oracle dependencies
-        run: pnpm install --frozen-lockfile --filter nullproof-oracle
+      # Install workspace dependencies (frontend needed for `pnpm snapshot`).
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       # ── Pre-flight checks ────────────────────────────────────────────────────
       # Verify required secrets are present before burning a network call.
@@ -171,8 +168,8 @@ jobs:
       # Ensure the output directory exists before the oracle tries to write to it.
       # writeSnapshot.ts calls mkdir({ recursive: true }) but a pre-check here
       # produces a cleaner error message if there is a permissions issue.
-      - name: Ensure frontend/data directory exists
-        run: mkdir -p frontend/data
+      - name: Ensure snapshot output directory exists
+        run: mkdir -p frontend/public/data
 
       # ── Run oracle ───────────────────────────────────────────────────────────
       # The oracle pipeline exits with code 0 on success.
@@ -200,12 +197,10 @@ jobs:
             ${{
               inputs.min_address_count
               || vars.MIN_ADDRESS_COUNT
-              || '100'
+              || '50'
             }}
 
-          # Output path — keep default (../frontend/data/imt-snapshot.json)
-          # relative to oracle/ which resolves to frontend/data/ in the repo root
-          SNAPSHOT_PATH: ""
+          MANIFEST_PATH: ""
 
           # Dry run: if set, we still run fetch+buildIMT but skip publishRoot.
           # The oracle does not natively support DRY_RUN — we handle this by
@@ -255,7 +250,7 @@ jobs:
         working-directory: oracle
         run: |
           # Read the manifest written by writeSnapshot (canonical source of truth)
-          MANIFEST="$(cat ../frontend/data/imt-manifest.json)"
+          MANIFEST="$(cat ../frontend/public/data/imt-manifest.json)"
 
           ROOT=$(echo "$MANIFEST"          | jq -r '.root')
           TX_HASH=$(echo "$MANIFEST"       | jq -r '.txHash')
@@ -292,7 +287,7 @@ jobs:
         shell: bash
         run: |
           # Stage the snapshot files to inspect the diff
-          git add frontend/data/imt-snapshot.json frontend/data/imt-manifest.json
+          git add frontend/public/data/sanctions-imt.json frontend/public/data/imt-manifest.json
 
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"

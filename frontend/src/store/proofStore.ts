@@ -3,6 +3,7 @@ import { devtools } from "zustand/middleware";
 import type { Hex } from "viem";
 
 import { PROOF_PUBLIC_INPUT_COUNT } from "@/lib/constants";
+import { isPlaceholderTxHash, readHistoryConfirmedMeta, readHistorySubmission } from "@/lib/proof/resolveSubmission";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -258,7 +259,68 @@ interface _PersistedProof {
   elapsedMs:  number | null;
 }
 
-function _saveLatestProof(result: ProofResult, submission: SubmissionResult | null, status: "generated" | "confirmed", elapsedMs: number | null): void {
+function _persistHistoryEntry(
+  result:     ProofResult,
+  submission: SubmissionResult | null,
+  elapsedMs:  number | null,
+): void {
+  try {
+    const raw      = localStorage.getItem(_HISTORY_KEY);
+    const existing = raw ? (JSON.parse(raw) as Array<{
+      id: string; txHash: string | null; confirmedAt: number | null; pending?: boolean;
+    }>) : [];
+    const prev = existing.find((e) => e.id === result.nullifier);
+
+    // Never downgrade a confirmed history row back to pending.
+    if (submission === null && prev) {
+      const wasConfirmed =
+        (prev.txHash && !isPlaceholderTxHash(prev.txHash)) ||
+        prev.confirmedAt !== null ||
+        prev.pending === false;
+      if (wasConfirmed && (prev.txHash || prev.confirmedAt !== null)) {
+        return;
+      }
+    }
+
+    const entry = {
+      id:           result.nullifier,
+      nullifier:    result.nullifier,
+      rootUsed:     result.rootUsed,
+      publicInputs: result.publicInputs,
+      elapsedMs,
+      generatedAt:  result.generatedAt,
+      txHash:       submission?.txHash ?? null,
+      confirmedAt:  submission?.confirmedAt ?? null,
+      blockNumber:  submission ? submission.blockNumber.toString() : null,
+      pending:      submission === null,
+    };
+    const filtered = existing.filter((e) => e.id !== entry.id);
+    localStorage.setItem(_HISTORY_KEY, JSON.stringify([entry, ...filtered]));
+  } catch { /* quota exceeded */ }
+}
+
+function _saveLatestProof(
+  result: ProofResult,
+  submission: SubmissionResult | null,
+  status: "generated" | "confirmed",
+  elapsedMs: number | null,
+): void {
+  // Never overwrite a confirmed latest-proof snapshot with a pending one.
+  if (status === "generated") {
+    try {
+      const raw = localStorage.getItem(_LATEST_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as _PersistedProof;
+        if (
+          parsed.status === "confirmed" &&
+          parsed.result.nullifier === result.nullifier
+        ) {
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
   try {
     const data: _PersistedProof = {
       result,
@@ -272,50 +334,68 @@ function _saveLatestProof(result: ProofResult, submission: SubmissionResult | nu
   } catch { /* quota exceeded */ }
 }
 
-function _loadLatestProof(): { result: ProofResult; submission: SubmissionResult | null; status: "generated" | "confirmed"; elapsedMs: number | null } | null {
+function _loadLatestProof(): {
+  result:     ProofResult;
+  submission: SubmissionResult | null;
+  status:     "generated" | "confirmed";
+  elapsedMs:  number | null;
+} | null {
   try {
     const raw = localStorage.getItem(_LATEST_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as _PersistedProof;
     if (!parsed?.result?.proof || !parsed?.result?.nullifier) return null;
-    // Discard if the proof is older than the validity window
+
+    const isConfirmed =
+      parsed.status === "confirmed" || parsed.submission !== null;
+
+    // Drop stale *unsubmitted* proofs only — keep confirmed records so the
+    // dashboard can show expired state and guide renewal.
     const refTime = parsed.submission?.confirmedAt ?? parsed.result.generatedAt;
-    if (Date.now() - refTime > _VALIDITY_MS) {
+    if (!isConfirmed && Date.now() - refTime > _VALIDITY_MS) {
       localStorage.removeItem(_LATEST_KEY);
       return null;
     }
+
     const submission: SubmissionResult | null = parsed.submission
-      ? { txHash: parsed.submission.txHash as `0x${string}`, confirmedAt: parsed.submission.confirmedAt, blockNumber: BigInt(parsed.submission.blockNumber) }
+      ? {
+          txHash:      parsed.submission.txHash as `0x${string}`,
+          confirmedAt: parsed.submission.confirmedAt,
+          blockNumber: BigInt(parsed.submission.blockNumber),
+        }
       : null;
-    return { result: parsed.result, submission, status: parsed.status, elapsedMs: parsed.elapsedMs };
+
+    // Promote generated snapshot when history has confirmed metadata.
+    if (parsed.status === "generated" && !submission) {
+      const fromHistory = readHistorySubmission(parsed.result.nullifier);
+      if (fromHistory) {
+        return {
+          result:     parsed.result,
+          submission: fromHistory,
+          status:     "confirmed",
+          elapsedMs:  parsed.elapsedMs,
+        };
+      }
+      const meta = readHistoryConfirmedMeta(parsed.result.nullifier);
+      if (meta) {
+        return {
+          result:     parsed.result,
+          submission: null,
+          status:     "generated",
+          elapsedMs:  parsed.elapsedMs,
+        };
+      }
+    }
+
+    return {
+      result:     parsed.result,
+      submission,
+      status:     parsed.status,
+      elapsedMs:  parsed.elapsedMs,
+    };
   } catch {
     return null;
   }
-}
-
-function _persistHistoryEntry(
-  result:     ProofResult,
-  submission: SubmissionResult | null,
-  elapsedMs:  number | null,
-): void {
-  try {
-    const entry = {
-      id:           result.nullifier,
-      nullifier:    result.nullifier,
-      rootUsed:     result.rootUsed,
-      publicInputs: result.publicInputs,
-      elapsedMs,
-      generatedAt:  result.generatedAt,
-      txHash:       submission?.txHash ?? null,
-      confirmedAt:  submission?.confirmedAt ?? null,
-      blockNumber:  submission ? submission.blockNumber.toString() : null,
-      pending:      submission === null,
-    };
-    const raw      = localStorage.getItem(_HISTORY_KEY);
-    const existing = raw ? (JSON.parse(raw) as typeof entry[]) : [];
-    const filtered = existing.filter((e) => e.id !== entry.id);
-    localStorage.setItem(_HISTORY_KEY, JSON.stringify([entry, ...filtered]));
-  } catch { /* quota exceeded */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -344,22 +424,58 @@ let _hydrating = false;
   _hydrating = false;
 })();
 
+// If hydrated without a fully-resolved tx hash, reconcile on-chain (upgrade hash or confirm).
+void import("@/lib/proof/resolveSubmission").then(({ promoteIfNullifierOnChain, isPlaceholderTxHash }) => {
+  const { result, submission, status, setConfirmed } = useProofStore.getState();
+  if (!result) return;
+  const needsReconcile =
+    status !== "confirmed" ||
+    submission === null ||
+    isPlaceholderTxHash(submission.txHash);
+  if (!needsReconcile) return;
+  void promoteIfNullifierOnChain(result.nullifier, setConfirmed, submission);
+});
+
 // Subscribe at module level — fires on every state change regardless of which
 // component is mounted. Persists on "generated" and "confirmed" transitions.
 // Skips re-persistence during the initial hydration setState call.
 let _prevProofStatus: ProofStatus = useProofStore.getState().status;
+let _lastPersistedTxHash: string | null = null;
 useProofStore.subscribe((state) => {
   if (_hydrating) return;
-  const changed = state.status !== _prevProofStatus;
+  const statusChanged = state.status !== _prevProofStatus;
 
-  if (changed && state.status === "generated" && state.result !== null) {
-    _persistHistoryEntry(state.result, null, state.elapsedMs);
-    _saveLatestProof(state.result, null, "generated", state.elapsedMs);
+  if (statusChanged && state.status === "generated" && state.result !== null) {
+    const existingConfirmed = readHistorySubmission(state.result.nullifier);
+    if (existingConfirmed) {
+      queueMicrotask(() => {
+        useProofStore.getState().setConfirmed(existingConfirmed);
+      });
+    } else {
+      _persistHistoryEntry(state.result, null, state.elapsedMs);
+      _saveLatestProof(state.result, null, "generated", state.elapsedMs);
+      _lastPersistedTxHash = null;
+
+      // Async: if nullifier is already on-chain, promote immediately.
+      void import("@/lib/proof/resolveSubmission").then(({ promoteIfNullifierOnChain }) =>
+        promoteIfNullifierOnChain(
+          state.result!.nullifier,
+          useProofStore.getState().setConfirmed,
+          useProofStore.getState().submission,
+        ),
+      );
+    }
   }
 
-  if (changed && state.status === "confirmed" && state.result !== null && state.submission !== null) {
+  if (
+    state.status === "confirmed" &&
+    state.result !== null &&
+    state.submission !== null &&
+    state.submission.txHash !== _lastPersistedTxHash
+  ) {
     _persistHistoryEntry(state.result, state.submission, state.elapsedMs);
     _saveLatestProof(state.result, state.submission, "confirmed", state.elapsedMs);
+    _lastPersistedTxHash = state.submission.txHash;
   }
 
   _prevProofStatus = state.status;

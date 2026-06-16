@@ -26,6 +26,26 @@ export const SANCTIONS_LIST_ADDRESS =
 export const VERIFIER_ADDRESS =
   (import.meta.env.VITE_VERIFIER_ADDRESS as string | undefined) ?? "";
 
+export const SUBMISSION_ROUTER_ADDRESS =
+  (import.meta.env.VITE_SUBMISSION_ROUTER_ADDRESS as string | undefined) ?? "";
+
+export const COMPLIANT_VAULT_ADDRESS =
+  (import.meta.env.VITE_COMPLIANT_VAULT_ADDRESS as string | undefined) ?? "";
+
+/** Use relayer API when router address is configured (override with VITE_USE_RELAYER). */
+export const USE_RELAYER =
+  import.meta.env.VITE_USE_RELAYER === "false"
+    ? false
+    : Boolean(SUBMISSION_ROUTER_ADDRESS);
+
+/** Allow direct wallet → ComplianceGate when relayer unavailable (dev only). */
+export const ALLOW_DIRECT_SUBMIT =
+  import.meta.env.VITE_ALLOW_DIRECT_SUBMIT === "true";
+
+/** Require EIP-712 relayer auth (disable after in-circuit nullifier binding). */
+export const REQUIRE_RELAYER_AUTH =
+  import.meta.env.VITE_REQUIRE_RELAYER_AUTH !== "false";
+
 // ---------------------------------------------------------------------------
 // Protocol parameters (mirrors on-chain defaults; used for pre-flight UI)
 // ---------------------------------------------------------------------------
@@ -50,7 +70,7 @@ export const MERKLE_TREE_DEPTH = 20;
  * Expected number of public inputs passed to Verifier.verify().
  * For NullProof this is exactly 1: the sanctions list Merkle root.
  */
-export const PROOF_PUBLIC_INPUT_COUNT = 1;
+export const PROOF_PUBLIC_INPUT_COUNT = 2;
 
 /**
  * Timeout in milliseconds for the in-browser proof generation call.
@@ -75,5 +95,8 @@ export const ORACLE_BASE_URL =
 // Block explorer helpers
 // ---------------------------------------------------------------------------
 
-export const txUrl  = (hash: string)    => `${BLOCK_EXPLORER_URL}/tx/${hash}`;
+export const txUrl = (hash: string): string | null => {
+  if (!hash || /^0x0+$/i.test(hash)) return null;
+  return `${BLOCK_EXPLORER_URL}/tx/${hash}`;
+};
 export const addrUrl = (address: string) => `${BLOCK_EXPLORER_URL}/address/${address}`;

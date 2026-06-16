@@ -2,6 +2,9 @@ packages:
   - frontend
   - oracle
 
+overrides:
+  typescript: ^5.5.0
+
 allowBuilds:
   '@reown/appkit': true
   bufferutil: true

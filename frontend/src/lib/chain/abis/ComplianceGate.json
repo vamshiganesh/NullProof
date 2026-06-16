@@ -411,6 +411,22 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "provided",
+        "type": "bytes32"
+      }
+    ],
+    "name": "NullifierMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "owner",
         "type": "address"

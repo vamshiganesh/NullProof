@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {Script, console2} from "forge-std/Script.sol";
 import {SanctionsList} from "../src/SanctionsList.sol";
 import {ComplianceGate} from "../src/ComplianceGate.sol";
+import {SubmissionRouter} from "../src/SubmissionRouter.sol";
+import {CompliantVault} from "../src/CompliantVault.sol";
 
 /// @title Deploy
 /// @notice Foundry deployment script for the NullProof contract suite.
@@ -38,6 +40,8 @@ contract Deploy is Script {
 
     SanctionsList public sanctionsListContract;
     ComplianceGate public complianceGateContract;
+    SubmissionRouter public submissionRouterContract;
+    CompliantVault public compliantVaultContract;
 
     // -------------------------------------------------------------------------
     // Main deployment entry point
@@ -140,6 +144,45 @@ contract Deploy is Script {
         vm.stopBroadcast();
 
         console2.log("Oracle authorised.");
+    }
+
+    /// @notice Deploy SubmissionRouter for relayer-mediated private submissions.
+    /// @dev Requires RELAYER_ADDRESS and COMPLIANCE_GATE_ADDRESS in .env.
+    ///      forge script script/Deploy.s.sol \
+    ///        --sig "deployRouter()" \
+    ///        --broadcast ...
+    function deployRouter() external {
+        uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address relayer = vm.envAddress("RELAYER_ADDRESS");
+        address gateAddr = vm.envAddress("COMPLIANCE_GATE_ADDRESS");
+
+        require(relayer != address(0), "Deploy: zero relayer");
+        require(gateAddr != address(0), "Deploy: zero compliance gate");
+
+        console2.log("=== Deploying SubmissionRouter ===");
+        console2.log("Relayer:          ", relayer);
+        console2.log("ComplianceGate:   ", gateAddr);
+
+        vm.startBroadcast(deployerKey);
+        submissionRouterContract = new SubmissionRouter(relayer, gateAddr);
+        vm.stopBroadcast();
+
+        console2.log("SubmissionRouter: ", address(submissionRouterContract));
+        console2.log("Copy SUBMISSION_ROUTER_ADDRESS into oracle/.env and frontend/.env.local");
+    }
+
+    /// @notice Deploy CompliantVault reference integration contract.
+    function deployVault() external {
+        uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address gateAddr = vm.envAddress("COMPLIANCE_GATE_ADDRESS");
+
+        require(gateAddr != address(0), "Deploy: zero compliance gate");
+
+        vm.startBroadcast(deployerKey);
+        compliantVaultContract = new CompliantVault(gateAddr);
+        vm.stopBroadcast();
+
+        console2.log("CompliantVault: ", address(compliantVaultContract));
     }
 
     // -------------------------------------------------------------------------

@@ -15,7 +15,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import type { Hex } from "viem";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -30,6 +29,7 @@ import {
 import { useWalletStore, selectAddress } from "@/store/walletStore";
 import { useSanctionsStore, selectCurrentRoot } from "@/store/sanctionsStore";
 import { formatHash }         from "@/lib/format";
+import { isPlaceholderTxHash } from "@/lib/proof/resolveSubmission";
 import {
   DEFAULT_VALIDITY_WINDOW_SECONDS,
   SUPPORTED_CHAIN_NAME,
@@ -338,7 +338,10 @@ function ConfirmedReceipt({ txHash, blockNumber, confirmedAt }: {
   txHash: string; blockNumber: bigint; confirmedAt: number;
 }) {
   const { copied, copy } = useCopy();
-  const explorerUrl = BLOCK_EXPLORER_URL ? `${BLOCK_EXPLORER_URL}/tx/${txHash}` : null;
+  const explorerUrl =
+    BLOCK_EXPLORER_URL && !isPlaceholderTxHash(txHash)
+      ? `${BLOCK_EXPLORER_URL}/tx/${txHash}`
+      : null;
 
   return (
     <div className="rounded-xl border border-[#22c55e]/20 bg-[#22c55e]/5 p-5">
@@ -402,7 +405,9 @@ export function ProofReady() {
 
   const phase: ShieldPhase = isConfirmed ? "confirmed" : status === "submitting" ? "submitting" : "ready";
   const rootMismatch = !!(result && currentRoot && result.rootUsed !== currentRoot);
-  const secsLeft = useExpiryCountdown(result?.generatedAt ?? null);
+  const validityRef  = submission?.confirmedAt ?? result?.generatedAt ?? null;
+  const secsLeft     = useExpiryCountdown(validityRef);
+  const complianceExpired = isConfirmed && secsLeft === 0;
 
   const { copied: globalCopied, copy: globalCopy } = useCopy();
 
@@ -413,31 +418,27 @@ export function ProofReady() {
     if (!result || !address) return;
     startSubmission();
     try {
-      const { writeAssertCompliant, createDefaultPublicClient } = await import("@/lib/chain/contracts");
-      const txHash = await writeAssertCompliant({
+      const { submitAssertCompliant } = await import("@/lib/chain/submitProof");
+      const { txHash, blockNumber } = await submitAssertCompliant({
         proof: result.proof, publicInputs: result.publicInputs,
         nullifier: result.nullifier, account: address,
       });
-      const publicClient = createDefaultPublicClient();
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-      setConfirmed({ txHash, confirmedAt: Date.now(), blockNumber: receipt.blockNumber });
+      setConfirmed({ txHash, confirmedAt: Date.now(), blockNumber });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed";
 
       if (msg.includes("NullifierAlreadyUsed") && result) {
-        // Nullifier already consumed on-chain from a prior session.
         try {
-          const { readNullifierUsedAt } = await import("@/lib/chain/contracts");
-          const usedAtSecs = await readNullifierUsedAt(result.nullifier);
-          const history    = localStorage.getItem("nullproof:history");
-          const txFromHistory: Hex | null = history
-            ? ((JSON.parse(history) as Array<{ id: string; txHash: string | null }>)
-                .find((e) => e.id === result.nullifier && e.txHash)?.txHash ?? null) as Hex | null
-            : null;
-          const txHash = txFromHistory ?? (("0x" + "00".repeat(32)) as Hex);
-          setConfirmed({ txHash, confirmedAt: Number(usedAtSecs) * 1000, blockNumber: 0n });
+          const { promoteIfNullifierOnChain } = await import("@/lib/proof/resolveSubmission");
+          const promoted = await promoteIfNullifierOnChain(
+            result.nullifier,
+            setConfirmed,
+            submission,
+          );
+          if (promoted) return;
+          setError("This proof was already submitted. Generate a refreshed proof to renew compliance.");
         } catch {
-          setError("Proof already submitted on-chain — check ZK Proofs history.");
+          setError("Proof already submitted on-chain — refresh the page.");
         }
         return;
       }
@@ -508,7 +509,7 @@ export function ProofReady() {
       </div>
 
       {/* ── Expiry banner ─────────────────────────────────────────── */}
-      {!isConfirmed && (
+      {(!isConfirmed || complianceExpired) && (
         <ExpiryBanner
           secsLeft={secsLeft}
           rootMismatch={rootMismatch}

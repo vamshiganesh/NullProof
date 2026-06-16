@@ -15,14 +15,32 @@ import { SUPPORTED_CHAIN_ID, SUPPORTED_CHAIN_NAME } from "@/lib/constants";
 // ---------------------------------------------------------------------------
 
 export interface ConnectWalletButtonProps {
-  /** Compact pill variant — used inside TopNav. Full button used on landing/empty states. */
-  variant?:   "full" | "compact";
+  /** `landing` — green CTA for the marketing nav; `compact` — app TopNav pill; `full` — default primary. */
+  variant?:   "full" | "compact" | "landing";
   className?: string;
   /** Called after successful connection. */
   onConnected?: (address: string) => void;
 }
 
 type ModalView = "select" | "connecting" | "wrong-network" | "error";
+
+function WalletIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M16 12h2" />
+    </svg>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Connector icons (inline SVG — zero bundle cost)
@@ -402,18 +420,41 @@ export function ConnectWalletButton({
     );
   }
 
+  if (variant === "landing") {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className={[
+            "inline-flex items-center gap-2 rounded-lg px-4 py-2",
+            "bg-[#22c55e] text-[13px] font-semibold text-white",
+            "transition-all duration-150 hover:bg-[#16a34a]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e]/50",
+            className,
+          ].join(" ")}
+        >
+          <WalletIcon className="h-4 w-4" />
+          Connect Wallet
+        </button>
+
+        {modalOpen && (
+          <ConnectModal
+            onClose={() => setModalOpen(false)}
+            onConnected={onConnected ?? (() => {})}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       <Button
         variant="primary"
         size="md"
         onClick={() => setModalOpen(true)}
-        leftIcon={
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="2" y="5" width="20" height="14" rx="2" />
-            <path d="M16 12h2" />
-          </svg>
-        }
+        leftIcon={<WalletIcon className="h-4 w-4" />}
         className={className}
       >
         Connect Wallet

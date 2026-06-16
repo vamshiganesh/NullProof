@@ -20,13 +20,14 @@ import React, {
   import { useAccount, useBalance } from "wagmi";
   
   import {
-    writeAssertCompliant,
     readValidityWindow,
     readSubmissionPaused,
     createDefaultPublicClient,
   } from "@/lib/chain/contracts";
+  import { submitAssertCompliant } from "@/lib/chain/submitProof";
+  import { writeVaultDeposit } from "@/lib/chain/contracts";
   import { formatETH, formatDuration, formatNullifier, formatHash } from "@/lib/format";
-  import { DEFAULT_VALIDITY_WINDOW_SECONDS } from "@/lib/constants";
+  import { COMPLIANT_VAULT_ADDRESS, DEFAULT_VALIDITY_WINDOW_SECONDS } from "@/lib/constants";
   import type { ProofData } from "@/types/proof";
   
   // ---------------------------------------------------------------------------
@@ -224,13 +225,28 @@ import React, {
       try {
         setSubmitState("simulating");
         setSubmitState("awaiting-wallet");
-  
-        const txHash = await writeAssertCompliant({
-          proof:        proof.proof     as `0x${string}`,
-          publicInputs: proof.publicInputs as `0x${string}`[],
-          nullifier:    proof.nullifier as `0x${string}`,
-          account:      address as Address,
-        });
+
+        const amountWei = parseAmountToWei(rawAmount);
+        if (!amountWei) return;
+
+        let txHash: string;
+        if (COMPLIANT_VAULT_ADDRESS) {
+          txHash = await writeVaultDeposit({
+            proof:        proof.proof     as `0x${string}`,
+            publicInputs: proof.publicInputs as `0x${string}`[],
+            nullifier:    proof.nullifier as `0x${string}`,
+            value:        amountWei,
+            account:      address as Address,
+          });
+        } else {
+          const result = await submitAssertCompliant({
+            proof:        proof.proof     as `0x${string}`,
+            publicInputs: proof.publicInputs as `0x${string}`[],
+            nullifier:    proof.nullifier as `0x${string}`,
+            account:      address as Address,
+          });
+          txHash = result.txHash;
+        }
   
         if (abortRef.current) return;
         setSubmitState("broadcasting");
@@ -274,7 +290,7 @@ import React, {
       !isPaused;
   
     const submitLabel: Record<SubmitState, string> = {
-      idle:             "Submit Proof & Deposit",
+      idle:             COMPLIANT_VAULT_ADDRESS ? "Deposit to CompliantVault" : "Submit Proof & Deposit",
       simulating:       "Simulating…",
       "awaiting-wallet":"Confirm in wallet…",
       broadcasting:     "Broadcasting…",

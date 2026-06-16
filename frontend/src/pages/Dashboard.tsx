@@ -188,7 +188,7 @@ function StatusCard({
       label:       "Proof Expired",
       badge:       "border-amber-500/20 bg-amber-500/10 text-amber-400",
       badgeText:   "EXPIRED",
-      sub:         "Generate a new proof to restore compliance",
+      sub:         "Generate a refreshed proof to renew on-chain compliance",
       barCls:      "bg-amber-400",
     },
     none: {
@@ -243,9 +243,9 @@ function StatusCard({
 
             <p className="mt-1 text-sm text-[#a0a0a0]">{cfg.sub}</p>
 
-            {txHash && (
+            {txHash && txUrl(txHash) && (
               <a
-                href={txUrl(txHash)}
+                href={txUrl(txHash)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center gap-1 font-mono text-[11px] text-[#646464] transition-colors hover:text-[#a0a0a0]"

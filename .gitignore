@@ -134,7 +134,8 @@ oracle/coverage/
 # ============================================================
 # MISC
 # ============================================================
-# Temporary files
+# Temporary / scratch notes (local only)
+temp.md
 *.tmp
 *.temp
 *.bak
@@ -154,5 +155,3 @@ yarn.lock
 package-lock.json
 
 frontend/.env.local
-
-temp.md

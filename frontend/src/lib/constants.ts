@@ -83,13 +83,18 @@ export const PROOF_GENERATION_TIMEOUT_MS = 60_000; // 60 s
 // ---------------------------------------------------------------------------
 
 /**
- * Base URL of the NullProof Node.js oracle backend.
- * Used by the frontend to fetch the current Merkle witness for a given address.
- * Falls back to localhost in development.
+ * Base URL of the NullProof relayer API (no trailing slash).
+ * Used for POST /api/submit and witness fetches.
  */
-export const ORACLE_BASE_URL =
-  (import.meta.env.VITE_ORACLE_BASE_URL as string | undefined) ??
-  "http://localhost:3001";
+function normalizeBaseUrl(url: string | undefined, fallback: string): string {
+  const raw = (url ?? fallback).trim();
+  return raw.replace(/\/+$/, "");
+}
+
+export const ORACLE_BASE_URL = normalizeBaseUrl(
+  import.meta.env.VITE_ORACLE_BASE_URL as string | undefined,
+  "http://localhost:3001",
+);
 
 // ---------------------------------------------------------------------------
 // Block explorer helpers

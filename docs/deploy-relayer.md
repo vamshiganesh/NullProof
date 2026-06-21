@@ -9,19 +9,39 @@ Host **only** the relayer (`pnpm oracle:api`). The daily OFAC oracle cron runs i
 
 ## Required environment variables
 
-| Variable | Example / notes |
-|----------|-----------------|
-| `CORS_ORIGIN` | `https://your-app.vercel.app` (no trailing slash) |
-| `RELAYER_PRIVATE_KEY` | From `oracle/.env` — wallet `0xB575…946a` |
-| `SUBMISSION_ROUTER_ADDRESS` | `0x094AC492023157c9e2F228e3620e31C249cd3035` |
-| `COMPLIANCE_GATE_ADDRESS` | `0x1906B284ef0DA8Dc41b531bb08E2Ae9eEAAeEA5f` |
-| `SEPOLIA_RPC_URL` | Alchemy Sepolia HTTPS URL |
-| `CHAIN_ID` | `11155111` |
-| `REQUIRE_RELAYER_AUTH` | `true` (or `false` for simpler UX) |
+
+| Variable                    | Example / notes                                   |
+| --------------------------- | ------------------------------------------------- |
+| `CORS_ORIGIN`               | `https://your-app.vercel.app` (no trailing slash) |
+| `RELAYER_PRIVATE_KEY`       | From `oracle/.env` — wallet `0xB575…946a`         |
+| `SUBMISSION_ROUTER_ADDRESS` | `0x094AC492023157c9e2F228e3620e31C249cd3035`      |
+| `COMPLIANCE_GATE_ADDRESS`   | `0x1906B284ef0DA8Dc41b531bb08E2Ae9eEAAeEA5f`      |
+| `SEPOLIA_RPC_URL`           | Alchemy Sepolia HTTPS URL                         |
+| `CHAIN_ID`                  | `11155111`                                        |
+| `REQUIRE_RELAYER_AUTH`      | `true` (or `false` for simpler UX)                |
+
 
 Do **not** set `PORT` on Railway or Render — the platform injects it.
 
 Do **not** deploy `pnpm oracle:run` here — that is the root-publisher cron for GitHub Actions.
+
+### CORS troubleshooting (`Failed to fetch` on submit)
+
+`CORS_ORIGIN` must match your Vercel URL **exactly** (https, host, no trailing slash). Example:
+
+```
+CORS_ORIGIN=https://nullproof-mocha.vercel.app
+```
+
+Verify after redeploy:
+
+```bash
+curl -s -D - -o /dev/null \
+  -H "Origin: https://nullproof-mocha.vercel.app" \
+  https://nullproof-relayer.onrender.com/api/health | grep -i access-control-allow-origin
+```
+
+You should see `access-control-allow-origin: https://nullproof-mocha.vercel.app`. If that header is missing, the browser will block submit requests.
 
 ---
 
@@ -36,11 +56,11 @@ Do **not** deploy `pnpm oracle:run` here — that is the root-publisher cron for
 1. Sign up at [render.com](https://render.com).
 2. **New → Blueprint** → connect `vamshiganesh/NullProof` → apply `render.yaml`.
 3. In the service **Environment** tab, set:
-   - `CORS_ORIGIN`
-   - `RELAYER_PRIVATE_KEY`
-   - `SEPOLIA_RPC_URL`
+  - `CORS_ORIGIN`
+  - `RELAYER_PRIVATE_KEY`
+  - `SEPOLIA_RPC_URL`
 4. Wait for deploy → copy public URL, e.g. `https://nullproof-relayer.onrender.com`.
-5. Set `VITE_ORACLE_BASE_URL` on Vercel to that URL.
+5. Set  on Vercel to that URL.
 6. (Optional) Add cron-job.org: `GET https://nullproof-relayer.onrender.com/api/health` every 10 minutes.
 
 ---
@@ -56,9 +76,9 @@ Do **not** deploy `pnpm oracle:run` here — that is the root-publisher cron for
 Railway often fails when it uses **Nixpacks** on the monorepo root instead of Docker.
 
 1. Open service → **Settings** → **Build**:
-   - **Builder:** Dockerfile
-   - **Dockerfile path:** `oracle/Dockerfile`
-   - **Root directory:** leave **empty** (repo root). Do not set `oracle/` — the Dockerfile `COPY` paths assume repo root context.
+  - **Builder:** Dockerfile
+  - **Dockerfile path:** `oracle/Dockerfile`
+  - **Root directory:** leave **empty** (repo root). Do not set `oracle/` — the Dockerfile `COPY` paths assume repo root context.
 2. **Settings** → **Deploy** → **Health check path:** `/api/health`
 3. **Variables** → add all relayer env vars (see table above). Use **Raw Editor** to paste from `oracle/.env` (relayer keys only).
 4. **Settings** → **Networking** → **Generate domain** (service is “Unexposed” until you do this).
@@ -69,9 +89,11 @@ Railway often fails when it uses **Nixpacks** on the monorepo root instead of Do
 ### Verify
 
 ```bash
-curl https://YOUR-RAILWAY-DOMAIN.up.railway.app/api/health
+curl https://YOUR-RELAYER.onrender.com/api/health
 # {"ok":true,"service":"nullproof-relayer"}
 ```
+
+Visiting the root URL (`/`) in a browser may return 404 until the latest deploy includes a service info handler — use `/api/health` to confirm the service is live.
 
 ---
 
@@ -101,3 +123,4 @@ docker build -f oracle/Dockerfile -t nullproof-relayer .
 docker run -p 3001:3001 --env-file oracle/.env nullproof-relayer
 curl http://localhost:3001/api/health
 ```
+

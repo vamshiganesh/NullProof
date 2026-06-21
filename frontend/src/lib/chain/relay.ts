@@ -92,16 +92,28 @@ export async function submitViaRelayer(
     deadline  = auth.deadline;
   }
 
-  const res = await fetch(`${ORACLE_BASE_URL}/api/submit`, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      proof:        params.proof,
-      publicInputs: params.publicInputs,
-      nullifier:    params.nullifier,
-      ...(signature ? { signature, deadline: deadline!.toString() } : {}),
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${ORACLE_BASE_URL}/api/submit`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        proof:        params.proof,
+        publicInputs: params.publicInputs,
+        nullifier:    params.nullifier,
+        ...(signature ? { signature, deadline: deadline!.toString() } : {}),
+      }),
+    });
+  } catch (err) {
+    const hint =
+      typeof window !== "undefined"
+        ? ` Check VITE_ORACLE_BASE_URL on Vercel (currently ${ORACLE_BASE_URL}) and CORS_ORIGIN on the relayer (must include ${window.location.origin}).`
+        : "";
+    throw new Error(
+      `Cannot reach relayer at ${ORACLE_BASE_URL}.${hint}`,
+      { cause: err },
+    );
+  }
 
   const body = (await res.json()) as { txHash?: string; error?: string };
   if (!res.ok || !body.txHash) {

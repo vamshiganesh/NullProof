@@ -25,10 +25,21 @@ app.use(
   }),
 );
 
+app.get("/", (c) =>
+  c.json({
+    service: "nullproof-relayer",
+    status:  "running",
+    endpoints: {
+      health: "GET /api/health",
+      submit: "POST /api/submit",
+    },
+  }),
+);
+
 app.route("/", createSubmitRouter());
 
-console.log(`[relayer] listening on http://localhost:${PORT}`);
-console.log(`[relayer] CORS origin: ${CORS_ORIGIN}`);
+console.log(`[relayer] listening on http://0.0.0.0:${PORT}`);
+console.log(`[relayer] CORS origins: ${CORS_ORIGIN.split(",").map((s) => s.trim()).join(" | ")}`);
 
 const server = serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" });
 

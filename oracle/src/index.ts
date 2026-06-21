@@ -109,7 +109,22 @@ async function runPipeline(): Promise<void> {
 
 // ── Scheduler ─────────────────────────────────────────────────────────────────
 
+/** GitHub Actions / one-shot runs: no local cron, exit with pipeline status. */
+const RUN_ONCE =
+  process.env["RUN_ONCE"] === "true" ||
+  process.env["GITHUB_ACTIONS"] === "true";
+
 async function startScheduler(): Promise<void> {
+  if (RUN_ONCE) {
+    try {
+      await runPipeline();
+    } catch (err) {
+      log("error", "pipeline.failed", { error: String(err) });
+      process.exit(1);
+    }
+    return;
+  }
+
   const cronExpr = process.env["CRON_SCHEDULE"] ?? "5 0 * * *";
 
   type CronScheduler = { schedule: (expr: string, fn: () => void) => void };
@@ -124,7 +139,7 @@ async function startScheduler(): Promise<void> {
     await runPipeline();
   } catch (err) {
     log("error", "pipeline.failed", { error: String(err) });
-    if (!cron) process.exit(1);
+    process.exit(1);
   }
 
   if (cron === undefined) return;

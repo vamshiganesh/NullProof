@@ -124,7 +124,7 @@ jobs:
           VITE_ALLOW_DIRECT_SUBMIT:      "true"
           # Suppress sourcemap generation during smoke check for speed
           NODE_ENV: production
-        run: pnpm --filter frontend build
+        run: pnpm --filter nullproof-frontend build
 
       # Upload the dist/ output so the deploy job can reuse it rather than
       # rebuilding from scratch. This ensures the deployed artifact is

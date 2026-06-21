@@ -171,6 +171,15 @@ jobs:
       - name: Ensure snapshot output directory exists
         run: mkdir -p frontend/public/data
 
+      # Treasury.gov can time out on GitHub runners — prefetch with retries.
+      - name: Prefetch OFAC SDN XML
+        id: ofac-prefetch
+        continue-on-error: true
+        run: |
+          curl -fsSL --retry 5 --retry-delay 10 --max-time 120 \
+            -o /tmp/sdn.xml https://www.treasury.gov/ofac/downloads/sdn.xml
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
       # ── Run oracle ───────────────────────────────────────────────────────────
       # The oracle pipeline exits with code 0 on success.
       # It throws (non-zero exit) if:
@@ -191,6 +200,8 @@ jobs:
           ORACLE_PRIVATE_KEY:       ${{ secrets.ORACLE_PRIVATE_KEY }}
           SANCTIONS_LIST_ADDRESS:   ${{ secrets.SANCTIONS_LIST_ADDRESS }}
           ORACLE_CONFIRMATIONS:     ${{ vars.ORACLE_CONFIRMATIONS || '2' }}
+          RUN_ONCE:                 "true"
+          OFAC_XML_PATH:            ${{ steps.ofac-prefetch.outputs.ok == 'true' && '/tmp/sdn.xml' || '' }}
 
           # Sanity floor — prefer workflow_dispatch input, then repo variable, then 100
           MIN_ADDRESS_COUNT: >-
@@ -220,13 +231,21 @@ jobs:
 
           set -e
 
-          # ── Handle "root unchanged" case ──────────────────────────────────
-          # publishRoot throws this exact message when root is same as on-chain.
-          # We normalise it to a no-op rather than a failure.
-          if grep -q "root unchanged" "$LOG_FILE"; then
+          # ── Success paths ─────────────────────────────────────────────────
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            if grep -q "publish.skipped" "$LOG_FILE"; then
+              echo "::notice::Root unchanged — OFAC list did not update today. Skipping commit and redeploy."
+              echo "root_unchanged=true" >> "$GITHUB_OUTPUT"
+              echo "skipped=true"        >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          # ── Legacy fallback if exit code non-zero but root was unchanged ───
+          if grep -qE "root unchanged|publish\.skipped" "$LOG_FILE"; then
             echo "::notice::Root unchanged — OFAC list did not update today. Skipping commit and redeploy."
-            echo "root_unchanged=true"  >> "$GITHUB_OUTPUT"
-            echo "skipped=true"         >> "$GITHUB_OUTPUT"
+            echo "root_unchanged=true" >> "$GITHUB_OUTPUT"
+            echo "skipped=true"        >> "$GITHUB_OUTPUT"
             exit 0
           fi
 

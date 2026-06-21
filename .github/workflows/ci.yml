@@ -37,7 +37,7 @@ permissions:
 # ---------------------------------------------------------------------------
 env:
   NODE_VERSION: "20"
-  PNPM_VERSION: "9"
+  PNPM_VERSION: "10"
   # Verified locally: nargo --version → 1.0.0-beta.19
   NARGO_VERSION: "1.0.0-beta.19"
   # Forge/Anvil version — keep in sync with foundry.lock

@@ -88,7 +88,7 @@ permissions:
 
 env:
   NODE_VERSION: "20"
-  PNPM_VERSION: "9"
+  PNPM_VERSION: "10"
   # Bot identity for the snapshot commit — this is the standard GitHub Actions
   # bot user. Using it means the push is attributed correctly in the git log
   # and does NOT re-trigger push-based CI workflows that filter by actor.

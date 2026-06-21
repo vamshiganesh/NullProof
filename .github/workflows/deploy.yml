@@ -64,7 +64,7 @@ permissions:
 # ---------------------------------------------------------------------------
 env:
   NODE_VERSION:   "20"
-  PNPM_VERSION:   "9"
+  PNPM_VERSION:   "10"
   VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 

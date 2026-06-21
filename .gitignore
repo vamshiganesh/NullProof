@@ -155,3 +155,5 @@ yarn.lock
 package-lock.json
 
 frontend/.env.local
+.vercel
+.env*

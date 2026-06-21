@@ -1,0 +1,15 @@
+# Railway — relayer API (Docker)
+# https://docs.railway.com/guides/config-as-code
+#
+# Connect repo → service Settings → set Root Directory to "/" (repo root, NOT oracle/).
+# Railway reads this file automatically.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "oracle/Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

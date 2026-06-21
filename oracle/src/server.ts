@@ -30,7 +30,7 @@ app.route("/", createSubmitRouter());
 console.log(`[relayer] listening on http://localhost:${PORT}`);
 console.log(`[relayer] CORS origin: ${CORS_ORIGIN}`);
 
-const server = serve({ fetch: app.fetch, port: PORT });
+const server = serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" });
 
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {

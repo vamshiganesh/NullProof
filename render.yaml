@@ -1,0 +1,31 @@
+# Render Blueprint — relayer API (free tier friendly)
+# https://render.com/docs/blueprint-spec
+#
+# Deploy: Dashboard → New → Blueprint → connect repo, or merge this file and sync.
+# Set secrets (RELAYER_PRIVATE_KEY, SEPOLIA_RPC_URL, CORS_ORIGIN) in the Render UI.
+
+services:
+  - type: web
+    name: nullproof-relayer
+    runtime: docker
+    dockerfilePath: ./oracle/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CHAIN_ID
+        value: "11155111"
+      - key: REQUIRE_RELAYER_AUTH
+        value: "true"
+      - key: SUBMISSION_ROUTER_ADDRESS
+        value: "0x094AC492023157c9e2F228e3620e31C249cd3035"
+      - key: COMPLIANCE_GATE_ADDRESS
+        value: "0x1906B284ef0DA8Dc41b531bb08E2Ae9eEAAeEA5f"
+      - key: CORS_ORIGIN
+        sync: false
+      - key: RELAYER_PRIVATE_KEY
+        sync: false
+      - key: SEPOLIA_RPC_URL
+        sync: false

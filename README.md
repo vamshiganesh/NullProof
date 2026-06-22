@@ -6,11 +6,11 @@
   <p><strong>Prove OFAC non-membership without revealing your wallet address.</strong></p>
 
   <p>
-    <a href="https://nullproof-mocha.vercel.app"><strong>Live Demo</strong></a>
+    <a href="https://nullproof-mocha.vercel.app" target="_blank" rel="noopener noreferrer"><strong>Live Demo</strong></a>
     &nbsp;·&nbsp;
-    <a href="https://www.youtube.com/watch?v=YP0X0sK0GME"><strong>YouTube</strong></a>
+    <a href="https://www.youtube.com/watch?v=YP0X0sK0GME" target="_blank" rel="noopener noreferrer"><strong>YouTube</strong></a>
     &nbsp;·&nbsp;
-    <a href="https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928"><strong>Verified Tx</strong></a>
+    <a href="https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928" target="_blank" rel="noopener noreferrer"><strong>Verified Tx</strong></a>
     &nbsp;·&nbsp;
     <a href="docs/architecture.md"><strong>Docs</strong></a>
   </p>
@@ -47,7 +47,7 @@ The system spans a Noir circuit, UltraHonk verifier contracts, a live OFAC inges
 ## Demo
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=YP0X0sK0GME">
+  <a href="https://www.youtube.com/watch?v=YP0X0sK0GME" target="_blank" rel="noopener noreferrer">
     <img
       src="docs/assets/NullProof-YTThumbnail.png"
       alt="Watch the NullProof demo on YouTube"
@@ -57,11 +57,11 @@ The system spans a Noir circuit, UltraHonk verifier contracts, a live OFAC inges
 </p>
 
 <p align="center">
-  <a href="https://nullproof-mocha.vercel.app"><strong>Live Demo</strong></a>
+  <a href="https://nullproof-mocha.vercel.app" target="_blank" rel="noopener noreferrer"><strong>Live Demo</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928"><strong>Verified Submission on Sepolia</strong></a>
+  <a href="https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928" target="_blank" rel="noopener noreferrer"><strong>Verified Submission on Sepolia</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://www.youtube.com/watch?v=YP0X0sK0GME"><strong>Watch on YouTube</strong></a>
+  <a href="https://www.youtube.com/watch?v=YP0X0sK0GME" target="_blank" rel="noopener noreferrer"><strong>Watch on YouTube</strong></a>
 </p>
 
 The walkthrough covers wallet connection, in-browser proof generation, relayer submission, on-chain verification, and an optional CompliantVault deposit.

@@ -1,6 +1,20 @@
-# NullProof
+<div align="center">
+  <img src="docs/assets/NullProof-GitHub-Logo.png" alt="NullProof" width="160" />
 
-**Prove OFAC non-membership without revealing your wallet address.**
+  <h1>NullProof</h1>
+
+  <p><strong>Prove OFAC non-membership without revealing your wallet address.</strong></p>
+
+  <p>
+    <a href="https://nullproof-mocha.vercel.app"><strong>Live Demo</strong></a>
+    &nbsp;·&nbsp;
+    <a href="https://www.youtube.com/watch?v=YP0X0sK0GME"><strong>YouTube</strong></a>
+    &nbsp;·&nbsp;
+    <a href="https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928"><strong>Verified Tx</strong></a>
+    &nbsp;·&nbsp;
+    <a href="docs/architecture.md"><strong>Docs</strong></a>
+  </p>
+</div>
 
 NullProof is a zero-knowledge compliance layer for Ethereum. A user generates a cryptographic proof in the browser that their address is absent from the U.S. Treasury OFAC SDN sanctions list. The proof is verified on-chain through a `ComplianceGate` contract that DeFi protocols can integrate into deposits, swaps, and other gated flows. The wallet address never appears in transaction calldata or on a public block explorer when submitted through the relayer.
 
@@ -8,17 +22,49 @@ The system spans a Noir circuit, UltraHonk verifier contracts, a live OFAC inges
 
 ---
 
+## Table of Contents
+
+- [Demo](#demo)
+- [The Problem](#the-problem)
+- [Solution Overview](#solution-overview)
+- [Proof Lifecycle](#proof-lifecycle)
+- [Privacy Architecture](#privacy-architecture)
+- [Technology Stack](#technology-stack)
+- [Repository Structure](#repository-structure)
+- [Circuit Design](#circuit-design)
+- [Smart Contracts](#smart-contracts)
+- [Oracle and Data Pipeline](#oracle-and-data-pipeline)
+- [Getting Started](#getting-started)
+- [Production Deployment](#production-deployment)
+- [Sepolia Testnet Deployment](#sepolia-testnet-deployment)
+- [Integration Guide](#integration-guide)
+- [Continuous Integration](#continuous-integration)
+- [Security Considerations](#security-considerations)
+- [License](#license)
+
+---
+
 ## Demo
 
-<!-- Replace VIDEO_ID with your YouTube video ID after upload -->
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=YP0X0sK0GME">
+    <img
+      src="docs/assets/NullProof-YTThumbnail.png"
+      alt="Watch the NullProof demo on YouTube"
+      width="640"
+    />
+  </a>
+</p>
 
-| | |
-|---|---|
-| **Video** | `https://www.youtube.com/watch?v=YP0X0sK0GME` |
-| **Thumbnail** | `[![NullProof demo](https://img.youtube.com/vi/YP0X0sK0GME/maxresdefault.jpg)](https://www.youtube.com/watch?v=YP0X0sK0GME)` |
-| **Live app** | `https://nullproof-mocha.vercel.app` |
-| **Verified submission** | `https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928` |
+<p align="center">
+  <a href="https://nullproof-mocha.vercel.app"><strong>Live Demo</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928"><strong>Verified Submission on Sepolia</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://www.youtube.com/watch?v=YP0X0sK0GME"><strong>Watch on YouTube</strong></a>
+</p>
 
+The walkthrough covers wallet connection, in-browser proof generation, relayer submission, on-chain verification, and an optional CompliantVault deposit.
 
 ---
 

@@ -14,8 +14,11 @@ The system spans a Noir circuit, UltraHonk verifier contracts, a live OFAC inges
 
 | | |
 |---|---|
-| **Video** | `https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE` |
-| **Thumbnail** | `[![NullProof demo](https://img.youtube.com/vi/YOUR_VIDEO_ID_HERE/maxresdefault.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE)` |
+| **Video** | `https://www.youtube.com/watch?v=YP0X0sK0GME` |
+| **Thumbnail** | `[![NullProof demo](https://img.youtube.com/vi/YP0X0sK0GME/maxresdefault.jpg)](https://www.youtube.com/watch?v=YP0X0sK0GME)` |
+| **Live app** | `https://nullproof-mocha.vercel.app` |
+| **Verified submission** | `https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928` |
+
 
 > Paste your YouTube link above once the walkthrough is uploaded. The demo should cover: wallet connection, in-browser proof generation, relayer submission, on-chain verification, and an optional CompliantVault deposit.
 
@@ -430,6 +433,7 @@ Contracts are deployed and verified on Ethereum Sepolia:
 | CompliantVault | `0x651304b0a0883C882Aa2a9a24E5AAC911AFc829f` |
 
 Explorer links: [ComplianceGate](https://sepolia.etherscan.io/address/0x1906B284ef0DA8Dc41b531bb08E2Ae9eEAAeEA5f) · [SanctionsList](https://sepolia.etherscan.io/address/0xc4981582b3Fd662F825BcAA943F06F3E91cBb628)
+Sample verified compliance submission: [Etherscan](https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928)
 
 ---
 

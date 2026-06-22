@@ -20,8 +20,6 @@ The system spans a Noir circuit, UltraHonk verifier contracts, a live OFAC inges
 | **Verified submission** | `https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928` |
 
 
-> Paste your YouTube link above once the walkthrough is uploaded. The demo should cover: wallet connection, in-browser proof generation, relayer submission, on-chain verification, and an optional CompliantVault deposit.
-
 ---
 
 ## The Problem

@@ -5,7 +5,7 @@
 // Two-pane layout:
 //   Left  — grid-canvas: animated sweep arm + red threat dots + green USER_WALLET node
 //   Right — Protocol Intelligence panel:
-//             • VALID / FLAGGED / OFFLINE badge
+//             • VALID / FLAGGED / UNSCREENED / OFFLINE badge
 //             • Network metrics (address count, root, snapshot date, scan counter)
 //             • Radar filters (toggle threats, speed, dot size)
 //             • Blip inspector (hovered dot detail)
@@ -20,6 +20,7 @@ import React, {
 } from "react";
 import { useAccount } from "wagmi";
 import { formatHash } from "@/lib/format";
+import { useProofStore, selectProofResult } from "@/store/proofStore";
 
 // ---------------------------------------------------------------------------
 // Snapshot type — matches the actual /data/sanctions-imt.json format
@@ -287,8 +288,23 @@ export function Radar() {
   });
 
   const { address, isConnected } = useAccount();
+  const proofResult = useProofStore(selectProofResult);
+  const hasProof    = proofResult !== null;
 
   const isReady = !loading && !error && isConnected && !!address;
+
+  type IntelStatus = "loading" | "offline" | "error" | "unscreened" | "valid" | "flagged";
+  const intelStatus: IntelStatus = loading
+    ? "loading"
+    : !isConnected
+    ? "offline"
+    : error
+    ? "error"
+    : !hasProof
+    ? "unscreened"
+    : flagged
+    ? "flagged"
+    : "valid";
 
   // ── Load snapshot ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -541,30 +557,38 @@ export function Radar() {
       {/* ── Protocol Intelligence panel ──────────────────────────── */}
       <div className="flex w-full flex-col gap-3 lg:w-72 lg:shrink-0">
 
-        {/* ① VALID / FLAGGED / OFFLINE badge ───────────────────── */}
+        {/* ① VALID / FLAGGED / UNSCREENED / OFFLINE badge ───────── */}
         <div className={[
           "rounded-xl border p-4 transition-colors",
-          !isConnected || loading
+          intelStatus === "loading" || intelStatus === "offline"
             ? "border-[#1e1e1e] bg-[#141414]"
-            : error
+            : intelStatus === "error"
             ? "border-rose-500/20 bg-rose-500/5"
-            : flagged
+            : intelStatus === "flagged"
             ? "border-rose-500/25 bg-rose-500/6"
-            : "border-[#22c55e]/20 bg-[#22c55e]/5",
+            : intelStatus === "valid"
+            ? "border-[#22c55e]/20 bg-[#22c55e]/5"
+            : "border-[#262626] bg-[#141414]",
         ].join(" ")}>
           <div className="flex items-center justify-between">
             <p className="font-mono text-[9px] uppercase tracking-widest text-[#3e3e3e]">
               Protocol Intelligence
             </p>
-            {isReady && (
+            {isReady && hasProof && (
               <span className={[
                 "flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider",
-                flagged
+                intelStatus === "flagged"
                   ? "border-rose-500/25 bg-rose-500/8 text-rose-400"
                   : "border-[#22c55e]/25 bg-[#22c55e]/8 text-[#22c55e]",
               ].join(" ")}>
-                <span className={["h-1.5 w-1.5 rounded-full", flagged ? "bg-rose-400 animate-pulse" : "bg-[#22c55e] animate-pulse"].join(" ")} />
-                {flagged ? "FLAGGED" : "VALID"}
+                <span className={["h-1.5 w-1.5 rounded-full", intelStatus === "flagged" ? "bg-rose-400 animate-pulse" : "bg-[#22c55e] animate-pulse"].join(" ")} />
+                {intelStatus === "flagged" ? "FLAGGED" : "VALID"}
+              </span>
+            )}
+            {isReady && !hasProof && (
+              <span className="flex items-center gap-1.5 rounded-full border border-[#262626] bg-[#1e1e1e] px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider text-[#646464]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#646464]" />
+                UNSCREENED
               </span>
             )}
           </div>
@@ -573,21 +597,23 @@ export function Radar() {
           <div className="mt-3 flex flex-col items-center gap-2 py-3">
             <div className={[
               "flex h-16 w-16 items-center justify-center rounded-2xl border transition-colors",
-              loading
+              intelStatus === "loading" || intelStatus === "offline" || intelStatus === "unscreened"
                 ? "border-[#1e1e1e] bg-[#0d0d0d]"
-                : flagged
+                : intelStatus === "error"
+                ? "border-rose-500/20 bg-rose-500/5"
+                : intelStatus === "flagged"
                 ? "border-rose-500/25 bg-rose-500/8"
-                : isReady
-                ? "border-[#22c55e]/20 bg-[#22c55e]/8"
-                : "border-[#1e1e1e] bg-[#0d0d0d]",
+                : "border-[#22c55e]/20 bg-[#22c55e]/8",
             ].join(" ")}>
-              {loading ? (
+              {intelStatus === "loading" ? (
                 <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#1e1e1e] border-t-[#22c55e]" />
-              ) : !isConnected ? (
+              ) : intelStatus === "offline" ? (
                 <WalletIcon className="h-7 w-7 text-[#3e3e3e]" />
-              ) : error ? (
+              ) : intelStatus === "error" ? (
                 <AlertIcon className="h-7 w-7 text-rose-400" />
-              ) : flagged ? (
+              ) : intelStatus === "unscreened" ? (
+                <ShieldIcon className="h-7 w-7 text-[#646464]" />
+              ) : intelStatus === "flagged" ? (
                 <ShieldOffIcon className="h-7 w-7 text-rose-400" />
               ) : (
                 <ShieldCheckIcon className="h-7 w-7 text-[#22c55e]" />
@@ -596,20 +622,29 @@ export function Radar() {
             <div className="text-center">
               <p className={[
                 "text-[15px] font-bold tracking-tight",
-                loading ? "text-[#646464]"
-                : flagged ? "text-rose-300"
-                : isReady ? "text-white"
-                : "text-[#646464]",
+                intelStatus === "loading" || intelStatus === "offline" || intelStatus === "unscreened"
+                  ? "text-[#646464]"
+                  : intelStatus === "error"
+                  ? "text-rose-300"
+                  : intelStatus === "flagged"
+                  ? "text-rose-300"
+                  : "text-white",
               ].join(" ")}>
-                {loading ? "Scanning…"
-                 : !isConnected ? "Offline"
-                 : error ? "Error"
-                 : flagged ? "Address Sanctioned"
+                {intelStatus === "loading" ? "Scanning…"
+                 : intelStatus === "offline" ? "Offline"
+                 : intelStatus === "error" ? "Error"
+                 : intelStatus === "unscreened" ? "No ZK proof yet"
+                 : intelStatus === "flagged" ? "Address Sanctioned"
                  : "Non-sanctioned"}
               </p>
               {address && (
                 <p className="mt-0.5 font-mono text-[10px] text-[#646464]">
                   {formatHash(address, 8, 6)}
+                </p>
+              )}
+              {intelStatus === "unscreened" && (
+                <p className="mt-1 text-[10px] text-[#3e3e3e]">
+                  Generate a proof to screen your wallet
                 </p>
               )}
             </div>
@@ -833,6 +868,9 @@ function TargetIcon({ className }: { className?: string }) {
 }
 function LegendIcon({ className }: { className?: string }) {
   return <svg viewBox="0 0 14 14" className={className ?? "h-3 w-3"} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="3" width="3" height="3" rx="0.5" /><path d="M7 4.5h5M7 7.5h5M7 10.5h5" /><rect x="2" y="7" width="3" height="3" rx="0.5" /></svg>;
+}
+function ShieldIcon({ className }: { className?: string }) {
+  return <svg viewBox="0 0 14 14" className={className ?? "h-5 w-5"} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 1.5L2 4v3.5C2 10.5 4 12 7 13c3-1 5-2.5 5-5.5V4L7 1.5z" /></svg>;
 }
 function ShieldCheckIcon({ className }: { className?: string }) {
   return <svg viewBox="0 0 14 14" className={className ?? "h-5 w-5"} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 1.5L2 4v3.5C2 10.5 4 12 7 13c3-1 5-2.5 5-5.5V4L7 1.5z" /><path d="M4.5 7l2 2 3-3" /></svg>;

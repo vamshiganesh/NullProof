@@ -67,11 +67,14 @@
       }
 
       .thumb-link {
-        display: inline-block;
-        margin: 0 0 1.5rem;
+        display: block;
+        width: fit-content;
+        max-width: 100%;
+        margin: 0 auto 1.5rem;
         border-radius: 12px;
         overflow: hidden;
         border: 1px solid var(--border);
+        line-height: 0;
         transition: border-color 0.2s ease;
       }
 
@@ -81,7 +84,8 @@
 
       .thumb-link img {
         display: block;
-        width: min(640px, 100%);
+        width: auto;
+        max-width: min(640px, 100%);
         height: auto;
       }
 

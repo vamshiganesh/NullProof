@@ -29,7 +29,7 @@ const NAV_ITEMS: SidebarItem[] = [
   { label: "Dashboard",  to: "/" ,          end: true  },
   { label: "ZK-Proofs",  to: "/proofs" },
   { label: "Compliance", to: "/compliance" },
-  { label: "Audits",     to: "/audits" },
+  // { label: "Audits",     to: "/audits" }, // v2 — hidden until Audit Log is built
   { label: "Settings",   to: "/settings" },
 ];
 

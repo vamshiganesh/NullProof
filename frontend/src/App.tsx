@@ -16,7 +16,7 @@
 //   /app/protocol/circuit      → redirect → /app/protocol?tab=circuit
 //   /app/ledger                → <Ledger>            (sanctions IMT explorer)
 //   /app/radar                 → <Radar>             (live sanctions feed)
-//   /app/audits                → <Audits>
+//   /app/audits                → <Audits>            (v2 — route disabled)
 //   /app/integrations          → <Integrations>
 //   *                          → <NotFound>
 //
@@ -76,7 +76,7 @@ const ProtocolCircuit = React.lazy(() => import("@/pages/ProtocolCircuit"));
 const Ledger          = React.lazy(() => import("@/pages/Ledger"));
 const Radar           = React.lazy(() => import("@/pages/Radar"));
 const Screening       = React.lazy(() => import("@/pages/Screening"));
-const Audits          = React.lazy(() => import("@/pages/Audits"));
+// const Audits          = React.lazy(() => import("@/pages/Audits")); // v2
 const Integrations    = React.lazy(() => import("@/pages/Integrations"));
 const NotFound        = React.lazy(() => import("@/pages/NotFound"));
 
@@ -318,8 +318,8 @@ function AppRoutes() {
         {/* Off-chain address screening tool */}
         <Route path="screening" element={<Screening />} />
 
-        {/* Audits */}
-        <Route path="audits" element={<Audits />} />
+        {/* Audits — v2 */}
+        {/* <Route path="audits" element={<Audits />} /> */}
 
         {/* Integrations */}
         <Route path="integrations" element={<Integrations />} />

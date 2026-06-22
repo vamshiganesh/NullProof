@@ -42,7 +42,7 @@ const NAV_LINKS = [
   { label: "Radar",        to: "/app/radar"        },
   { label: "Screening",    to: "/app/screening"    },
   { label: "Protocol",     to: "/app/protocol"     },
-  { label: "Audits",       to: "/app/audits"       },
+  // { label: "Audits",       to: "/app/audits"       }, // v2 — hidden until Audit Log is built
   { label: "Integrations", to: "/app/integrations" },
 ] as const;
 

@@ -3,6 +3,12 @@
   "outputDirectory": "dist",
   "installCommand": "cd .. && pnpm install --frozen-lockfile",
   "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/((?!assets/|data/|circuits/|favicon).*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

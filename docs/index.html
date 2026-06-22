@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NullProof — Links</title>
+    <meta
+      name="description"
+      content="NullProof project links: live demo, demo video, and verified Sepolia submission."
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #090909;
+        --panel: #141414;
+        --border: #1e1e1e;
+        --text: #e5e5e5;
+        --muted: #8a8a8a;
+        --green: #22c55e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        padding: 2rem 1rem;
+      }
+
+      main {
+        width: min(720px, 100%);
+        text-align: center;
+      }
+
+      img.logo {
+        width: min(280px, 70vw);
+        height: auto;
+        margin-bottom: 1rem;
+      }
+
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: clamp(1.75rem, 4vw, 2.25rem);
+        letter-spacing: -0.02em;
+      }
+
+      .tagline {
+        margin: 0 0 1.5rem;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+
+      .thumb-link {
+        display: inline-block;
+        margin: 0 0 1.5rem;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        transition: border-color 0.2s ease;
+      }
+
+      .thumb-link:hover {
+        border-color: #2a2a2a;
+      }
+
+      .thumb-link img {
+        display: block;
+        width: min(640px, 100%);
+        height: auto;
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .links a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 9rem;
+        padding: 0.75rem 1.1rem;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 0.95rem;
+        font-weight: 600;
+        transition:
+          border-color 0.2s ease,
+          color 0.2s ease;
+      }
+
+      .links a:hover {
+        border-color: rgba(34, 197, 94, 0.35);
+        color: var(--green);
+      }
+
+      .note,
+      .repo-link {
+        color: var(--muted);
+        font-size: 0.875rem;
+        line-height: 1.6;
+      }
+
+      .repo-link a {
+        color: var(--green);
+        text-decoration: none;
+      }
+
+      .repo-link a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img class="logo" src="assets/NullProof-GitHub-Logo.png" alt="NullProof" />
+
+      <h1>NullProof</h1>
+      <p class="tagline">
+        Prove OFAC non-membership without revealing your wallet address.
+      </p>
+
+      <a
+        class="thumb-link"
+        href="https://www.youtube.com/watch?v=YP0X0sK0GME"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <img
+          src="assets/NullProof-YTThumbnail.png"
+          alt="Watch the NullProof demo on YouTube"
+        />
+      </a>
+
+      <div class="links">
+        <a
+          href="https://nullproof-mocha.vercel.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Live Demo</a
+        >
+        <a
+          href="https://sepolia.etherscan.io/tx/0xc84cc16c43044974d6ec15cc25dc4365f67f9071b978faeebf6fc6219423c928"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Verified Submission</a
+        >
+        <a
+          href="https://www.youtube.com/watch?v=YP0X0sK0GME"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Watch on YouTube</a
+        >
+      </div>
+
+      <p class="note">
+        External links on this page open in a new tab.
+      </p>
+      <p class="repo-link">
+        <a href="https://github.com/vamshiganesh/NullProof">View source on GitHub</a>
+      </p>
+    </main>
+  </body>
+</html>

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ISanctionsList} from "./interfaces/ISanctionsList.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ISanctionsList } from "./interfaces/ISanctionsList.sol";
 
 /// @title SanctionsList
 /// @notice Stores and manages the Merkle root of the OFAC sanctions list.
@@ -75,11 +75,7 @@ contract SanctionsList is ISanctionsList, Ownable {
         _currentAddressCount = addressCount;
 
         _rootHistory.push(newRoot);
-        _rootEntries[newRoot] = RootEntry({
-            addressCount: addressCount,
-            timestamp: block.timestamp,
-            exists: true
-        });
+        _rootEntries[newRoot] = RootEntry({ addressCount: addressCount, timestamp: block.timestamp, exists: true });
 
         emit RootUpdated(previousRoot, newRoot, addressCount, block.timestamp);
     }
@@ -108,11 +104,7 @@ contract SanctionsList is ISanctionsList, Ownable {
         external
         view
         override
-        returns (
-            uint256 addressCount,
-            uint256 timestamp,
-            bool exists
-        )
+        returns (uint256 addressCount, uint256 timestamp, bool exists)
     {
         RootEntry storage entry = _rootEntries[root];
         return (entry.addressCount, entry.timestamp, entry.exists);

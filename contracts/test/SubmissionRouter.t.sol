@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {SubmissionRouter} from "../src/SubmissionRouter.sol";
-import {IComplianceGate} from "../src/interfaces/IComplianceGate.sol";
+import { Test } from "forge-std/Test.sol";
+import { SubmissionRouter } from "../src/SubmissionRouter.sol";
+import { IComplianceGate } from "../src/interfaces/IComplianceGate.sol";
 
 // -------------------------------------------------------------------------
 // Mock gate — records calls from the router
@@ -15,25 +15,41 @@ contract MockComplianceGate is IComplianceGate {
     address public lastCaller;
     uint256 public callCount;
 
-    function assertCompliant(
-        bytes calldata proof,
-        bytes32[] calldata,
-        bytes32 nullifier
-    ) external override {
+    function assertCompliant(bytes calldata proof, bytes32[] calldata, bytes32 nullifier) external override {
         lastProof = proof;
         lastNullifier = nullifier;
         lastCaller = msg.sender;
         callCount++;
     }
 
-  // Unused interface stubs
-  function checkCompliant(bytes calldata, bytes32[] calldata, bytes32) external pure returns (bool) { return true; }
-  function isNullifierUsed(bytes32) external pure returns (bool) { return false; }
-  function nullifierUsedAt(bytes32) external pure returns (uint256) { return 0; }
-  function sanctionsList() external pure returns (address) { return address(0); }
-  function verifier() external pure returns (address) { return address(0); }
-  function validityWindow() external pure returns (uint256) { return 0; }
-  function submissionPaused() external pure returns (bool) { return false; }
+    // Unused interface stubs
+    function checkCompliant(bytes calldata, bytes32[] calldata, bytes32) external pure returns (bool) {
+        return true;
+    }
+
+    function isNullifierUsed(bytes32) external pure returns (bool) {
+        return false;
+    }
+
+    function nullifierUsedAt(bytes32) external pure returns (uint256) {
+        return 0;
+    }
+
+    function sanctionsList() external pure returns (address) {
+        return address(0);
+    }
+
+    function verifier() external pure returns (address) {
+        return address(0);
+    }
+
+    function validityWindow() external pure returns (uint256) {
+        return 0;
+    }
+
+    function submissionPaused() external pure returns (bool) {
+        return false;
+    }
 }
 
 // -------------------------------------------------------------------------

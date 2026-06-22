@@ -63,9 +63,8 @@ permissions:
 # Environment
 # ---------------------------------------------------------------------------
 env:
-  NODE_VERSION:   "20"
-  PNPM_VERSION:   "10"
-  VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+  NODE_VERSION: "20"
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
 # ===========================================================================
@@ -85,10 +84,8 @@ jobs:
         with:
           submodules: false
 
-      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+      - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -112,16 +109,16 @@ jobs:
           # Stub values — valid-shaped but not real.
           # Vite only needs these present at build time; the app reads them at
           # runtime from import.meta.env which Vite replaces with string literals.
-          VITE_COMPLIANCE_GATE_ADDRESS:  "0x0000000000000000000000000000000000000001"
-          VITE_SANCTIONS_LIST_ADDRESS:   "0x0000000000000000000000000000000000000002"
-          VITE_VERIFIER_ADDRESS:         "0x0000000000000000000000000000000000000003"
+          VITE_COMPLIANCE_GATE_ADDRESS: "0x0000000000000000000000000000000000000001"
+          VITE_SANCTIONS_LIST_ADDRESS: "0x0000000000000000000000000000000000000002"
+          VITE_VERIFIER_ADDRESS: "0x0000000000000000000000000000000000000003"
           VITE_SUBMISSION_ROUTER_ADDRESS: "0x0000000000000000000000000000000000000004"
-          VITE_COMPLIANT_VAULT_ADDRESS:  "0x0000000000000000000000000000000000000005"
-          VITE_ORACLE_BASE_URL:          "https://relayer.example.com"
+          VITE_COMPLIANT_VAULT_ADDRESS: "0x0000000000000000000000000000000000000005"
+          VITE_ORACLE_BASE_URL: "https://relayer.example.com"
           VITE_WALLETCONNECT_PROJECT_ID: "00000000000000000000000000000000"
-          VITE_SEPOLIA_RPC_URL:          "https://rpc.sepolia.org"
-          VITE_USE_RELAYER:              "true"
-          VITE_ALLOW_DIRECT_SUBMIT:      "true"
+          VITE_SEPOLIA_RPC_URL: "https://rpc.sepolia.org"
+          VITE_USE_RELAYER: "true"
+          VITE_ALLOW_DIRECT_SUBMIT: "true"
           # Suppress sourcemap generation during smoke check for speed
           NODE_ENV: production
         run: pnpm --filter nullproof-frontend build
@@ -134,7 +131,7 @@ jobs:
         with:
           name: frontend-dist-${{ github.sha }}
           path: frontend/dist
-          retention-days: 1   # Only needed for this pipeline run; discard after
+          retention-days: 1 # Only needed for this pipeline run; discard after
 
   # ===========================================================================
   # Job 2 — Vercel production deploy
@@ -149,7 +146,7 @@ jobs:
     # can reference it without parsing CLI output again
     outputs:
       deployment-url: ${{ steps.deploy.outputs.deployment-url }}
-      deployment-id:  ${{ steps.deploy.outputs.deployment-id }}
+      deployment-id: ${{ steps.deploy.outputs.deployment-id }}
 
     steps:
       - name: Checkout repository
@@ -157,10 +154,8 @@ jobs:
         with:
           submodules: false
 
-      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+      - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -254,9 +249,9 @@ jobs:
     # Always run notify — even if deploy failed — so we always set a commit status
     if: always()
     permissions:
-      contents:  read
-      statuses:  write
-      issues:    write       # for createComment on PRs merged to main
+      contents: read
+      statuses: write
+      issues: write # for createComment on PRs merged to main
 
     steps:
       - name: Set deploy outcome variables

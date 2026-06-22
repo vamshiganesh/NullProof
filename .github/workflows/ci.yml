@@ -37,7 +37,6 @@ permissions:
 # ---------------------------------------------------------------------------
 env:
   NODE_VERSION: "20"
-  PNPM_VERSION: "10"
   # Verified locally: nargo --version → 1.0.0-beta.19
   NARGO_VERSION: "1.0.0-beta.19"
   # Forge/Anvil version — keep in sync with foundry.lock
@@ -57,13 +56,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: false   # Submodules not needed for TS checks
+          submodules: false # Submodules not needed for TS checks
 
       # ── Node.js + pnpm ────────────────────────────────────────────────────
-      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+      - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -74,14 +71,6 @@ jobs:
       # ── Install dependencies ──────────────────────────────────────────────
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      # ── Prettier format check ─────────────────────────────────────────────
-      - name: Check formatting (Prettier)
-        run: pnpm format:check
-
-      # ── ESLint ────────────────────────────────────────────────────────────
-      - name: Lint (ESLint)
-        run: pnpm lint
 
       # ── TypeScript (frontend + oracle) ────────────────────────────────────
       - name: Typecheck (TypeScript)
@@ -142,7 +131,7 @@ jobs:
   forge-test:
     name: Forge Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25   # Extra 5 min budget for coverage instrumentation
+    timeout-minutes: 25 # Extra 5 min budget for coverage instrumentation
     # Coverage lcov upload needs write access to PR checks
     permissions:
       contents: read

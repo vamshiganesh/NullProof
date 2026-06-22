@@ -80,19 +80,18 @@ on:
 # If a manual dispatch fires while the cron is mid-run, cancel the cron.
 concurrency:
   group: update-sanctions
-  cancel-in-progress: false   # Never cancel a mid-flight on-chain tx
+  cancel-in-progress: false # Never cancel a mid-flight on-chain tx
 
 permissions:
-  contents: write   # Required to push the snapshot commit
-  statuses:  write  # For optional commit status annotation
+  contents: write # Required to push the snapshot commit
+  statuses: write # For optional commit status annotation
 
 env:
   NODE_VERSION: "20"
-  PNPM_VERSION: "10"
-  # Bot identity for the snapshot commit — this is the standard GitHub Actions
+  # Bot identity for the snapshot commit
   # bot user. Using it means the push is attributed correctly in the git log
   # and does NOT re-trigger push-based CI workflows that filter by actor.
-  GIT_AUTHOR_NAME:  "github-actions[bot]"
+  GIT_AUTHOR_NAME: "github-actions[bot]"
   GIT_AUTHOR_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
 
 # ===========================================================================
@@ -102,15 +101,16 @@ jobs:
   run-oracle:
     name: Run Oracle Pipeline
     runs-on: ubuntu-latest
-    timeout-minutes: 30   # The publishRoot step waits for 2-block confirmation;
-                          # Sepolia can be slow. 30 min is generous but bounded.
+    timeout-minutes:
+      30 # The publishRoot step waits for 2-block confirmation;
+      # Sepolia can be slow. 30 min is generous but bounded.
 
     # Outputs let the trigger-deploy job know whether to bother deploying
     outputs:
       snapshot-changed: ${{ steps.detect-changes.outputs.changed }}
-      new-root:         ${{ steps.parse-output.outputs.root }}
-      tx-hash:          ${{ steps.parse-output.outputs.tx_hash }}
-      address-count:    ${{ steps.parse-output.outputs.address_count }}
+      new-root: ${{ steps.parse-output.outputs.root }}
+      tx-hash: ${{ steps.parse-output.outputs.tx_hash }}
+      address-count: ${{ steps.parse-output.outputs.address_count }}
 
     steps:
       # ── Checkout ─────────────────────────────────────────────────────────────
@@ -127,10 +127,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # ── Node / pnpm ──────────────────────────────────────────────────────────
-      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+      - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -161,9 +159,9 @@ jobs:
 
           echo "✓ All required secrets are present."
         env:
-          SEPOLIA_RPC_URL:          ${{ secrets.SEPOLIA_RPC_URL }}
-          ORACLE_PRIVATE_KEY:       ${{ secrets.ORACLE_PRIVATE_KEY }}
-          SANCTIONS_LIST_ADDRESS:   ${{ secrets.SANCTIONS_LIST_ADDRESS }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          ORACLE_PRIVATE_KEY: ${{ secrets.ORACLE_PRIVATE_KEY }}
+          SANCTIONS_LIST_ADDRESS: ${{ secrets.SANCTIONS_LIST_ADDRESS }}
 
       # Ensure the output directory exists before the oracle tries to write to it.
       # writeSnapshot.ts calls mkdir({ recursive: true }) but a pre-check here
@@ -196,12 +194,12 @@ jobs:
         working-directory: oracle
         env:
           # On-chain config
-          SEPOLIA_RPC_URL:          ${{ secrets.SEPOLIA_RPC_URL }}
-          ORACLE_PRIVATE_KEY:       ${{ secrets.ORACLE_PRIVATE_KEY }}
-          SANCTIONS_LIST_ADDRESS:   ${{ secrets.SANCTIONS_LIST_ADDRESS }}
-          ORACLE_CONFIRMATIONS:     ${{ vars.ORACLE_CONFIRMATIONS || '2' }}
-          RUN_ONCE:                 "true"
-          OFAC_XML_PATH:            ${{ steps.ofac-prefetch.outputs.ok == 'true' && '/tmp/sdn.xml' || '' }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          ORACLE_PRIVATE_KEY: ${{ secrets.ORACLE_PRIVATE_KEY }}
+          SANCTIONS_LIST_ADDRESS: ${{ secrets.SANCTIONS_LIST_ADDRESS }}
+          ORACLE_CONFIRMATIONS: ${{ vars.ORACLE_CONFIRMATIONS || '2' }}
+          RUN_ONCE: "true"
+          OFAC_XML_PATH: ${{ steps.ofac-prefetch.outputs.ok == 'true' && '/tmp/sdn.xml' || '' }}
 
           # Sanity floor — prefer workflow_dispatch input, then repo variable, then 100
           MIN_ADDRESS_COUNT: >-
@@ -338,10 +336,10 @@ jobs:
           && inputs.dry_run != true
         shell: bash
         env:
-          ROOT:          ${{ steps.parse-output.outputs.root }}
-          TX_HASH:       ${{ steps.parse-output.outputs.tx_hash }}
+          ROOT: ${{ steps.parse-output.outputs.root }}
+          TX_HASH: ${{ steps.parse-output.outputs.tx_hash }}
           ADDRESS_COUNT: ${{ steps.parse-output.outputs.address_count }}
-          PUBLISHED_AT:  ${{ steps.parse-output.outputs.published_at }}
+          PUBLISHED_AT: ${{ steps.parse-output.outputs.published_at }}
         run: |
           git config user.name  "${{ env.GIT_AUTHOR_NAME }}"
           git config user.email "${{ env.GIT_AUTHOR_EMAIL }}"
@@ -391,7 +389,7 @@ jobs:
       && inputs.dry_run != true
 
     env:
-      VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
     steps:
@@ -402,10 +400,8 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Set up pnpm ${{ env.PNPM_VERSION }}
+      - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -459,10 +455,10 @@ jobs:
         if: always()
         shell: bash
         env:
-          DEPLOY_URL:    ${{ steps.vercel-deploy.outputs.deployment-url }}
-          ROOT:          ${{ needs.run-oracle.outputs.new-root }}
+          DEPLOY_URL: ${{ steps.vercel-deploy.outputs.deployment-url }}
+          ROOT: ${{ needs.run-oracle.outputs.new-root }}
           ADDRESS_COUNT: ${{ needs.run-oracle.outputs.address-count }}
-          TX_HASH:       ${{ needs.run-oracle.outputs.tx-hash }}
+          TX_HASH: ${{ needs.run-oracle.outputs.tx-hash }}
         run: |
           echo "### Vercel Deploy"                              >> "$GITHUB_STEP_SUMMARY"
           echo "| Field | Value |"                             >> "$GITHUB_STEP_SUMMARY"

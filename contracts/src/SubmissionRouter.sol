@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IComplianceGate} from "./interfaces/IComplianceGate.sol";
+import { IComplianceGate } from "./interfaces/IComplianceGate.sol";
 
 /// @title SubmissionRouter
 /// @notice Relayer-only entry point for private compliance submissions.
@@ -20,8 +20,8 @@ contract SubmissionRouter {
     // Immutables
     // -------------------------------------------------------------------------
 
-  address public immutable relayer;
-  IComplianceGate public immutable gate;
+    address public immutable relayer;
+    IComplianceGate public immutable gate;
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -41,11 +41,7 @@ contract SubmissionRouter {
     /// @param proof        Serialized UltraHonk proof bytes.
     /// @param publicInputs Public inputs array (root at index 0).
     /// @param nullifier    One-time nullifier for replay protection.
-    function submitCompliant(
-        bytes calldata proof,
-        bytes32[] calldata publicInputs,
-        bytes32 nullifier
-    ) external {
+    function submitCompliant(bytes calldata proof, bytes32[] calldata publicInputs, bytes32 nullifier) external {
         if (msg.sender != relayer) revert OnlyRelayer();
         gate.assertCompliant(proof, publicInputs, nullifier);
     }

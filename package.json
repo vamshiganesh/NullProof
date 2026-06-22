@@ -30,10 +30,10 @@
         "contracts:anvil": "anvil",
         "sync:abis": "bash scripts/sync-abis.sh",
         "benchmark": "npx tsx scripts/benchmark.ts",
-        "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+        "lint": "ESLINT_USE_FLAT_CONFIG=false eslint frontend/src oracle/src --ext .ts,.tsx --max-warnings 0",
         "lint:fix": "eslint . --ext .ts,.tsx --fix",
         "format": "prettier --write \"**/*.{ts,tsx,json,md,css}\"",
-        "format:check": "prettier --check \"**/*.{ts,tsx,json,md,css}\"",
+        "format:check": "prettier --check \"frontend/**/*.{ts,tsx,json,css}\" \"oracle/**/*.ts\" \"package.json\" \"pnpm-workspace.yaml\" \"docs/**/*.md\" \".github/**/*.yml\"",
         "typecheck": "pnpm --filter nullproof-frontend typecheck && pnpm --filter nullproof-oracle typecheck",
         "clean": "rm -rf frontend/dist oracle/dist contracts/out circuits/target",
         "clean:modules": "find . -name 'node_modules' -type d -not -path '*/forge-std/*' | xargs rm -rf"

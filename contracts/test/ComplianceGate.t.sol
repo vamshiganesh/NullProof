@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console2} from "forge-std/Test.sol";
-import {ComplianceGate} from "../src/ComplianceGate.sol";
-import {SanctionsList} from "../src/SanctionsList.sol";
-import {IComplianceGate} from "../src/interfaces/IComplianceGate.sol";
-import {IVerifier} from "../src/interfaces/IVerifier.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { ComplianceGate } from "../src/ComplianceGate.sol";
+import { SanctionsList } from "../src/SanctionsList.sol";
+import { IComplianceGate } from "../src/interfaces/IComplianceGate.sol";
+import { IVerifier } from "../src/interfaces/IVerifier.sol";
 
 // -------------------------------------------------------------------------
 // Mock Verifier — returns whatever we tell it to
@@ -22,10 +22,7 @@ contract MockVerifier is IVerifier {
         _shouldPass = value;
     }
 
-    function verify(
-        bytes calldata,
-        bytes32[] calldata
-    ) external view override returns (bool) {
+    function verify(bytes calldata, bytes32[] calldata) external view override returns (bool) {
         return _shouldPass;
     }
 }
@@ -43,16 +40,16 @@ contract ComplianceGateTest is Test {
     SanctionsList public sanctionsList;
     MockVerifier public verifier;
 
-    address public owner    = makeAddr("owner");
-    address public oracle   = makeAddr("oracle");
-    address public user     = makeAddr("user");
+    address public owner = makeAddr("owner");
+    address public oracle = makeAddr("oracle");
+    address public user = makeAddr("user");
     address public stranger = makeAddr("stranger");
 
-    bytes32 public constant ROOT_A    = keccak256("root_a");
-    bytes32 public constant ROOT_B    = keccak256("root_b");
+    bytes32 public constant ROOT_A = keccak256("root_a");
+    bytes32 public constant ROOT_B = keccak256("root_b");
     bytes32 public constant NULLIFIER = keccak256("nullifier_1");
 
-    bytes   public validProof    = abi.encodePacked(bytes32("proof_bytes"));
+    bytes public validProof = abi.encodePacked(bytes32("proof_bytes"));
     bytes32[] public publicInputs;
 
     // -------------------------------------------------------------------------
@@ -73,7 +70,7 @@ contract ComplianceGateTest is Test {
 
         // Publish ROOT_A on the sanctions list
         vm.prank(oracle);
-        sanctionsList.updateRoot(ROOT_A, 3_412);
+        sanctionsList.updateRoot(ROOT_A, 3412);
 
         // Build publicInputs with ROOT_A at index 0 and NULLIFIER at index 1
         publicInputs = new bytes32[](2);
@@ -129,9 +126,7 @@ contract ComplianceGateTest is Test {
     function test_assertCompliant_revertsOnNullifierMismatch() public {
         bytes32 wrong = keccak256("wrong_nullifier");
         vm.prank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(IComplianceGate.NullifierMismatch.selector, NULLIFIER, wrong)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IComplianceGate.NullifierMismatch.selector, NULLIFIER, wrong));
         gate.assertCompliant(validProof, publicInputs, wrong);
     }
 
@@ -179,9 +174,7 @@ contract ComplianceGateTest is Test {
         gate.assertCompliant(validProof, publicInputs, NULLIFIER);
 
         vm.prank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(IComplianceGate.NullifierAlreadyUsed.selector, NULLIFIER)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IComplianceGate.NullifierAlreadyUsed.selector, NULLIFIER));
         gate.assertCompliant(validProof, publicInputs, NULLIFIER);
     }
 
@@ -198,7 +191,7 @@ contract ComplianceGateTest is Test {
     function test_assertCompliant_revertsOnExpiredRoot() public {
         // Publish ROOT_B replacing ROOT_A
         vm.prank(oracle);
-        sanctionsList.updateRoot(ROOT_B, 3_424);
+        sanctionsList.updateRoot(ROOT_B, 3424);
 
         // Warp past validity window
         vm.warp(block.timestamp + gate.DEFAULT_VALIDITY_WINDOW() + 1);
@@ -232,7 +225,7 @@ contract ComplianceGateTest is Test {
     function test_assertCompliant_acceptsOldRootWithinWindow() public {
         // Publish ROOT_B replacing ROOT_A
         vm.prank(oracle);
-        sanctionsList.updateRoot(ROOT_B, 3_424);
+        sanctionsList.updateRoot(ROOT_B, 3424);
 
         // Still within validity window — ROOT_A proof should pass
         vm.warp(block.timestamp + gate.DEFAULT_VALIDITY_WINDOW() - 1);
@@ -315,7 +308,7 @@ contract ComplianceGateTest is Test {
     function test_setValidityWindow_revertsIfTooLong() public {
         vm.prank(owner);
         vm.expectRevert("ComplianceGate: window too long");
-        gate.setValidityWindow(604801);
+        gate.setValidityWindow(604_801);
     }
 
     // -------------------------------------------------------------------------
@@ -403,9 +396,7 @@ contract ComplianceGateTest is Test {
         gate.assertCompliant(validProof, inputs, nullifier);
 
         vm.prank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(IComplianceGate.NullifierAlreadyUsed.selector, nullifier)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IComplianceGate.NullifierAlreadyUsed.selector, nullifier));
         gate.assertCompliant(validProof, inputs, nullifier);
     }
 }

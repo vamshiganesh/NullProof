@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {ICompliantVault} from "./interfaces/ICompliantVault.sol";
-import {IComplianceGate} from "./interfaces/IComplianceGate.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { ICompliantVault } from "./interfaces/ICompliantVault.sol";
+import { IComplianceGate } from "./interfaces/IComplianceGate.sol";
 
 /// @title CompliantVault
 /// @notice Reference vault demonstrating protocol-integrated compliance.
@@ -21,12 +21,12 @@ contract CompliantVault is ICompliantVault, ReentrancyGuard {
         gate = IComplianceGate(gate_);
     }
 
-  /// @inheritdoc ICompliantVault
-    function deposit(
-        bytes calldata proof,
-        bytes32[] calldata publicInputs,
-        bytes32 nullifier
-    ) external payable nonReentrant {
+    /// @inheritdoc ICompliantVault
+    function deposit(bytes calldata proof, bytes32[] calldata publicInputs, bytes32 nullifier)
+        external
+        payable
+        nonReentrant
+    {
         if (msg.value == 0) revert ZeroAmount();
 
         gate.assertCompliant(proof, publicInputs, nullifier);
@@ -37,25 +37,25 @@ contract CompliantVault is ICompliantVault, ReentrancyGuard {
         emit Deposited(msg.sender, msg.value, nullifier, root);
     }
 
-  /// @inheritdoc ICompliantVault
+    /// @inheritdoc ICompliantVault
     function withdraw(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         if (_balances[msg.sender] < amount) revert InsufficientBalance();
 
         _balances[msg.sender] -= amount;
 
-        (bool ok, ) = msg.sender.call{value: amount}("");
+        (bool ok,) = msg.sender.call{ value: amount }("");
         require(ok, "CompliantVault: transfer failed");
 
         emit Withdrawn(msg.sender, amount);
     }
 
-  /// @inheritdoc ICompliantVault
+    /// @inheritdoc ICompliantVault
     function balanceOf(address account) external view returns (uint256) {
         return _balances[account];
     }
 
-  /// @inheritdoc ICompliantVault
+    /// @inheritdoc ICompliantVault
     function complianceGate() external view returns (address) {
         return address(gate);
     }

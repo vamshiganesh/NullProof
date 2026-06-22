@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console2} from "forge-std/Test.sol";
-import {SanctionsList} from "../src/SanctionsList.sol";
-import {ISanctionsList} from "../src/interfaces/ISanctionsList.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { SanctionsList } from "../src/SanctionsList.sol";
+import { ISanctionsList } from "../src/interfaces/ISanctionsList.sol";
 
 contract SanctionsListTest is Test {
     // -------------------------------------------------------------------------
@@ -12,17 +12,17 @@ contract SanctionsListTest is Test {
 
     SanctionsList public sanctionsList;
 
-    address public owner   = makeAddr("owner");
-    address public oracle  = makeAddr("oracle");
+    address public owner = makeAddr("owner");
+    address public oracle = makeAddr("oracle");
     address public stranger = makeAddr("stranger");
 
     bytes32 public constant ROOT_A = keccak256("root_a");
     bytes32 public constant ROOT_B = keccak256("root_b");
     bytes32 public constant ROOT_C = keccak256("root_c");
 
-    uint256 public constant COUNT_A = 3_412;
-    uint256 public constant COUNT_B = 3_424;
-    uint256 public constant COUNT_C = 3_430;
+    uint256 public constant COUNT_A = 3412;
+    uint256 public constant COUNT_B = 3424;
+    uint256 public constant COUNT_C = 3430;
 
     // -------------------------------------------------------------------------
     // Setup

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IComplianceGate} from "./interfaces/IComplianceGate.sol";
-import {ISanctionsList} from "./interfaces/ISanctionsList.sol";
-import {IVerifier} from "./interfaces/IVerifier.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IComplianceGate } from "./interfaces/IComplianceGate.sol";
+import { ISanctionsList } from "./interfaces/ISanctionsList.sol";
+import { IVerifier } from "./interfaces/IVerifier.sol";
 
 /// @title ComplianceGate
 /// @notice Main integration contract for ZK-gated OFAC compliance enforcement.
@@ -36,7 +36,7 @@ contract ComplianceGate is IComplianceGate, Ownable, ReentrancyGuard {
 
     /// @dev Minimum validity window: 1 hour. Prevents owner from making
     ///      proofs expire so fast they become unusable.
-    uint256 public constant MIN_VALIDITY_WINDOW = 3_600;
+    uint256 public constant MIN_VALIDITY_WINDOW = 3600;
 
     // -------------------------------------------------------------------------
     // Storage
@@ -67,11 +67,7 @@ contract ComplianceGate is IComplianceGate, Ownable, ReentrancyGuard {
     /// @param initialOwner     Address that receives Ownable ownership.
     /// @param sanctionsListAddr Address of the deployed SanctionsList contract.
     /// @param verifierAddr      Address of the deployed Verifier contract.
-    constructor(
-        address initialOwner,
-        address sanctionsListAddr,
-        address verifierAddr
-    ) Ownable(initialOwner) {
+    constructor(address initialOwner, address sanctionsListAddr, address verifierAddr) Ownable(initialOwner) {
         require(sanctionsListAddr != address(0), "ComplianceGate: zero sanctions list");
         require(verifierAddr != address(0), "ComplianceGate: zero verifier");
 
@@ -85,11 +81,11 @@ contract ComplianceGate is IComplianceGate, Ownable, ReentrancyGuard {
     // -------------------------------------------------------------------------
 
     /// @inheritdoc IComplianceGate
-    function assertCompliant(
-        bytes calldata proof,
-        bytes32[] calldata publicInputs,
-        bytes32 nullifier
-    ) external override nonReentrant {
+    function assertCompliant(bytes calldata proof, bytes32[] calldata publicInputs, bytes32 nullifier)
+        external
+        override
+        nonReentrant
+    {
         if (_submissionPaused) revert SubmissionPaused();
         if (proof.length == 0) revert EmptyProof();
         if (_usedNullifiers[nullifier]) revert NullifierAlreadyUsed(nullifier);
@@ -115,11 +111,12 @@ contract ComplianceGate is IComplianceGate, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IComplianceGate
-    function checkCompliant(
-        bytes calldata proof,
-        bytes32[] calldata publicInputs,
-        bytes32 nullifier
-    ) external view override returns (bool valid) {
+    function checkCompliant(bytes calldata proof, bytes32[] calldata publicInputs, bytes32 nullifier)
+        external
+        view
+        override
+        returns (bool valid)
+    {
         if (_submissionPaused) return false;
         if (proof.length == 0) return false;
         if (_usedNullifiers[nullifier]) return false;

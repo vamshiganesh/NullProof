@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Script, console2} from "forge-std/Script.sol";
-import {SanctionsList} from "../src/SanctionsList.sol";
-import {ComplianceGate} from "../src/ComplianceGate.sol";
-import {SubmissionRouter} from "../src/SubmissionRouter.sol";
-import {CompliantVault} from "../src/CompliantVault.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { SanctionsList } from "../src/SanctionsList.sol";
+import { ComplianceGate } from "../src/ComplianceGate.sol";
+import { SubmissionRouter } from "../src/SubmissionRouter.sol";
+import { CompliantVault } from "../src/CompliantVault.sol";
 
 /// @title Deploy
 /// @notice Foundry deployment script for the NullProof contract suite.
@@ -69,11 +69,7 @@ contract Deploy is Script {
         console2.log("SanctionsList:    ", address(sanctionsListContract));
 
         // Step 2: Deploy ComplianceGate
-        complianceGateContract = new ComplianceGate(
-            deployer,
-            address(sanctionsListContract),
-            verifierAddr
-        );
+        complianceGateContract = new ComplianceGate(deployer, address(sanctionsListContract), verifierAddr);
         console2.log("ComplianceGate:   ", address(complianceGateContract));
 
         vm.stopBroadcast();
@@ -94,7 +90,9 @@ contract Deploy is Script {
         console2.log("Verifier deployment must be run after generating Verifier.sol via bb contract.");
         console2.log("Steps:");
         console2.log("  1. nargo compile");
-        console2.log("  2. bb write_vk --scheme ultra_honk -b circuit/target/nullproof_non_membership.json -o circuit/target/vk");
+        console2.log(
+            "  2. bb write_vk --scheme ultra_honk -b circuit/target/nullproof_non_membership.json -o circuit/target/vk"
+        );
         console2.log("  3. bb contract --scheme ultra_honk -k circuit/target/vk -o contracts/src/Verifier.sol");
         console2.log("  4. forge script script/Deploy.s.sol --sig deployVerifier() --broadcast ...");
         console2.log("  5. Set VERIFIER_ADDRESS in .env to the deployed address");
@@ -189,21 +187,13 @@ contract Deploy is Script {
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    function _validateInputs(
-        address deployer,
-        address oracle,
-        address verifierAddr
-    ) internal pure {
+    function _validateInputs(address deployer, address oracle, address verifierAddr) internal pure {
         require(deployer != address(0), "Deploy: zero deployer");
         require(oracle != address(0), "Deploy: zero oracle");
         require(verifierAddr != address(0), "Deploy: zero verifier - deploy Verifier.sol first");
     }
 
-    function _logDeployment(
-        address deployer,
-        address oracle,
-        address verifierAddr
-    ) internal view {
+    function _logDeployment(address deployer, address oracle, address verifierAddr) internal view {
         console2.log("");
         console2.log("=== Deployment Complete ===");
         console2.log("Network:          Sepolia");
@@ -224,14 +214,8 @@ contract Deploy is Script {
     }
 
     function _verifiyInvariants() internal view {
-        require(
-            address(sanctionsListContract) != address(0),
-            "Deploy: SanctionsList not deployed"
-        );
-        require(
-            address(complianceGateContract) != address(0),
-            "Deploy: ComplianceGate not deployed"
-        );
+        require(address(sanctionsListContract) != address(0), "Deploy: SanctionsList not deployed");
+        require(address(complianceGateContract) != address(0), "Deploy: ComplianceGate not deployed");
         require(
             complianceGateContract.sanctionsList() == address(sanctionsListContract),
             "Deploy: ComplianceGate points to wrong SanctionsList"

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/assets/NullProof-GitHub-Logo.png" alt="NullProof" width="300" />
+  <img src="docs/assets/NullProof-GitHub-Logo.png" alt="NullProof" width="600" />
 
   <h1>NullProof</h1>
 

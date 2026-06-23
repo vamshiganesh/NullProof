@@ -11,7 +11,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAccount } from "wagmi";
 
 import {
   DEFAULT_VALIDITY_WINDOW_SECONDS,
@@ -218,7 +217,7 @@ function TopNav() {
 // HeroSection
 // ---------------------------------------------------------------------------
 
-function HeroSection({ isConnected }: { isConnected: boolean }) {
+function HeroSection() {
   return (
     <section
       className="relative flex min-h-[calc(100dvh-60px)] flex-col items-center justify-center px-5 py-28 text-center sm:px-8"
@@ -262,7 +261,7 @@ function HeroSection({ isConnected }: { isConnected: boolean }) {
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e]/50",
           ].join(" ")}
         >
-          {isConnected ? "Go to dashboard" : "Connect Wallet"}
+          Go to dashboard
           <ArrowRightIcon className="h-3 w-3" />
         </Link>
 
@@ -516,13 +515,11 @@ function Footer() {
 // ---------------------------------------------------------------------------
 
 export function Landing() {
-  const { isConnected } = useAccount();
-
   return (
     <div className="min-h-dvh bg-[#0d0d0d] text-white">
       <TopNav />
       <main style={{ paddingTop: NAV_H }}>
-        <HeroSection isConnected={isConnected} />
+        <HeroSection />
         <StatsSection />
         <ProtocolFlowSection />
       </main>

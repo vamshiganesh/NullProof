@@ -311,7 +311,7 @@ const STATS: StatItem[] = [
     accent: false,
   },
   {
-    value:  "<3s",
+    value:  "<15s",
     label:  "Avg. proof generation time",
     accent: false,
   },
